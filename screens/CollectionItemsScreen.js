@@ -1,0 +1,461 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  Alert,
+  SafeAreaView,
+  ActivityIndicator,
+  Dimensions,
+  Animated,
+  StatusBar,
+} from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
+import { supabase } from '../lib/supabase';
+import { useTheme } from '../context/ThemeContext';
+import { Typography, Button, Card, Layout, createThemedStyles } from '../theme/styled';
+
+const { width } = Dimensions.get('window');
+const numColumns = 2;
+const itemWidth = (width - 40) / numColumns;
+
+const CollectionItemsScreen = ({ route, navigation }) => {
+  // Get collection details from navigation params
+  const { collectionId, collectionName, collectionIcon } = route.params;
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [deletingItemId, setDeletingItemId] = useState(null);
+  const { theme, isDarkMode } = useTheme();
+  
+  // Reference to track open swipeable items
+  const swipeableRefs = useRef({});
+  
+  // Fetch items when component mounts or collection changes
+  useEffect(() => {
+    fetchItems();
+    
+    // Log navigation params for debugging
+    console.log('Collection Items Screen - Params:', { 
+      collectionId, 
+      collectionName, 
+      collectionIcon 
+    });
+  }, [collectionId]);
+
+  // Function to fetch items from Supabase
+  const fetchItems = async () => {
+    try {
+      setLoading(true);
+      console.log(`Fetching items for collection ID: ${collectionId}`);
+      
+      const { data, error } = await supabase
+        .from('items')
+        .select('*')
+        .eq('collection_id', collectionId)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        throw error;
+      }
+      
+      console.log(`Fetched ${data.length} items for collection`);
+      setItems(data);
+    } catch (error) {
+      console.error('Error fetching items:', error.message);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to load items. Please try again.',
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+  
+  // Function to handle refresh
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchItems();
+  };
+  
+  // Function to handle item tap
+  const handleItemTap = (item) => {
+    console.log(`Item tapped: ${item.name}`);
+    navigation.navigate('ItemDetail', { itemId: item.id });
+  };
+  
+  // Function to delete an item
+  const deleteItem = async (itemId, itemName) => {
+    Alert.alert(
+      'Delete Item',
+      `Are you sure you want to delete "${itemName}"?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeletingItemId(itemId);
+              console.log(`Deleting item with ID: ${itemId}`);
+              
+              const { error } = await supabase
+                .from('items')
+                .delete()
+                .eq('id', itemId);
+              
+              if (error) {
+                throw error;
+              }
+              
+              // Remove the item from state
+              setItems(items.filter(item => item.id !== itemId));
+              
+              Toast.show({
+                type: 'success',
+                text1: 'Item Deleted',
+                text2: `${itemName} has been deleted.`,
+              });
+            } catch (error) {
+              console.error('Error deleting item:', error.message);
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: 'Failed to delete item. Please try again.',
+              });
+            } finally {
+              setDeletingItemId(null);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+  
+  // Function to close all open swipeable items
+  const closeAllSwipeables = (exceptId) => {
+    Object.keys(swipeableRefs.current).forEach(id => {
+      if (id !== exceptId && swipeableRefs.current[id]) {
+        swipeableRefs.current[id].close();
+      }
+    });
+  };
+  
+  // Function to render right actions for swipeable
+  const renderRightActions = (item) => {
+    return (
+      <TouchableOpacity
+        style={styles.deleteAction}
+        onPress={() => deleteItem(item.id, item.name)}
+      >
+        {deletingItemId === item.id ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <>
+            <Ionicons name="trash-outline" size={22} color="#fff" />
+            <Text style={styles.deleteActionText}>Delete</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    );
+  };
+  
+  // Function to navigate to add item screen
+  const handleAddItem = () => {
+    // Show options to add new item or select existing item
+    Alert.alert(
+      'Add to Collection',
+      'Would you like to add a new item or select an existing item?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'New Item',
+          onPress: () => {
+            navigation.navigate('Add', { 
+              screen: 'AddMain',
+              params: {
+                preSelectedCollectionId: collectionId,
+                preSelectedCollectionName: collectionName
+              }
+            });
+          }
+        },
+        {
+          text: 'Existing Item',
+          onPress: () => {
+            // Navigate to the SelectExistingItem screen
+            navigation.navigate('SelectExistingItem', {
+              collectionId,
+              collectionName
+            });
+          }
+        }
+      ]
+    );
+  };
+
+  // Function to render an item card
+  const renderItem = ({ item }) => {
+    // Get the first photo URL or use a placeholder
+    const photoUrl = item.photos && item.photos.length > 0
+      ? item.photos[0]
+      : 'https://via.placeholder.com/150/CCCCCC/888888?text=No+Image';
+    
+    return (
+      <Swipeable
+        ref={ref => {
+          if (ref) swipeableRefs.current[item.id] = ref;
+        }}
+        renderRightActions={() => renderRightActions(item)}
+        onSwipeableOpen={() => closeAllSwipeables(item.id)}
+        overshootRight={false}
+      >
+        <TouchableOpacity
+          style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}
+          onPress={() => handleItemTap(item)}
+          activeOpacity={0.8}
+        >
+          <Image 
+            source={{ uri: photoUrl }} 
+            style={styles.itemImage}
+            resizeMode="cover"
+          />
+          <View style={styles.itemDetails}>
+            <Text style={[styles.itemName, { color: theme.colors.text }]} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={[styles.itemCategory, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+              {item.category || 'Uncategorized'}
+            </Text>
+            {item.brand && (
+              <Text style={[styles.itemBrand, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                Brand: {item.brand}
+              </Text>
+            )}
+          </View>
+          <View style={[styles.menuButton, { backgroundColor: isDarkMode ? 'rgba(30, 30, 30, 0.8)' : 'rgba(255, 255, 255, 0.8)' }]}>
+            <TouchableOpacity
+              onPress={() => deleteItem(item.id, item.name)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Swipeable>
+    );
+  };
+  
+  // Function to render empty state
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="cube-outline" size={60} color={theme.colors.divider} />
+      <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+        {loading ? 'Loading items...' : 'No items in this collection yet.'}
+      </Text>
+      {!loading && (
+        <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
+          Tap the + button to add items to this collection.
+        </Text>
+      )}
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={theme.colors.background} />
+      
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.divider }]}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        
+        <View style={styles.headerTitle}>
+          <Text style={styles.collectionIcon}>{collectionIcon}</Text>
+          <Text style={[styles.collectionName, { color: theme.colors.text }]} numberOfLines={1}>
+            {collectionName}
+          </Text>
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={handleAddItem}
+        >
+          <Ionicons name="add" size={24} color={theme.colors.primary} />
+        </TouchableOpacity>
+      </View>
+      
+      {/* Items Grid */}
+      <FlatList
+        data={items}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id.toString()}
+        numColumns={numColumns}
+        contentContainerStyle={[styles.gridContainer, { backgroundColor: theme.colors.background }]}
+        ListEmptyComponent={renderEmptyState}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+        showsVerticalScrollIndicator={false}
+        columnWrapperStyle={styles.columnWrapper}
+      />
+
+      {/* Floating Add Button for Mobile UX */}
+      <TouchableOpacity 
+        style={[styles.floatingButton, { backgroundColor: theme.colors.primary }]}
+        onPress={handleAddItem}
+      >
+        <Ionicons name="add" size={24} color="#fff" />
+      </TouchableOpacity>
+    </SafeAreaView>
+  );
+};
+
+const styles = createThemedStyles((theme) => ({
+  safeArea: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  collectionIcon: {
+    fontSize: 22,
+    marginRight: 8,
+  },
+  collectionName: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  addButton: {
+    padding: 4,
+  },
+  gridContainer: {
+    padding: 10,
+    flexGrow: 1,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+  },
+  itemCard: {
+    borderRadius: 12,
+    marginBottom: 16,
+    width: itemWidth,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    position: 'relative',
+  },
+  itemImage: {
+    width: '100%',
+    height: itemWidth,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    backgroundColor: '#f0f0f0',
+  },
+  itemDetails: {
+    padding: 12,
+  },
+  itemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  itemCategory: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  itemBrand: {
+    fontSize: 12,
+  },
+  menuButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteAction: {
+    backgroundColor: 'tomato',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 100,
+    height: '100%',
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  deleteActionText: {
+    color: '#fff',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+}));
+
+export default CollectionItemsScreen;
