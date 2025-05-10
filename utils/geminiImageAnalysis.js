@@ -9,10 +9,14 @@ const getGeminiApiKey = () => {
   // Fallback to process.env (for development)
   const processApiKey = process.env.GEMINI_API_KEY;
   
-  // Use the hardcoded key as a final fallback
-  const hardcodedApiKey = 'AIzaSyA_4QgeXN3alaB0RJRTgt6id6FOxbKGWOI';
+  const apiKey = expoApiKey || processApiKey;
   
-  return expoApiKey || processApiKey || hardcodedApiKey;
+  if (!apiKey) {
+    console.error('No Gemini API key found. Please set GEMINI_API_KEY in your .env file');
+    throw new Error('Missing Gemini API key');
+  }
+  
+  return apiKey;
 };
 
 /**
