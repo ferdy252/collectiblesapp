@@ -93,15 +93,16 @@ const UnifiedImagePicker = ({
     // Log the original URI for debugging
     console.log('Original URI:', uri);
     
-    // Handle different URI formats
+    // Handle different URI formats consistently across platforms
     let formattedUri = uri;
     
-    // Remove any 'file://' prefix to standardize the URI
+    // First, normalize by removing any existing 'file://' prefix
     if (formattedUri.startsWith('file://')) {
       formattedUri = formattedUri.substring(7);
     }
     
-    // Make sure the URI starts with 'file://' on iOS
+    // For iOS: Always ensure the URI starts with 'file://'
+    // For Android: Use the URI without 'file://' prefix
     if (Platform.OS === 'ios') {
       formattedUri = `file://${formattedUri}`;
     }
@@ -152,8 +153,20 @@ const UnifiedImagePicker = ({
       return;
     }
     
-    // Check if the image already exists in the array (using the formatted URI)
-    if (!images.includes(formattedUri)) {
+    // More robust check for duplicate images
+    // We'll normalize all URIs for comparison to catch duplicates with different formatting
+    const isDuplicate = images.some(existingUri => {
+      // Normalize both URIs by removing file:// prefix for comparison
+      const normalizedExisting = existingUri.replace('file://', '');
+      const normalizedNew = formattedUri.replace('file://', '');
+      
+      // Compare the normalized paths
+      return normalizedExisting === normalizedNew;
+    });
+    
+    console.log('Duplicate image check result:', isDuplicate);
+    
+    if (!isDuplicate) {
       // Create a new array with the new image added
       const updatedImages = [...images, formattedUri];
       console.log('Updated images array:', updatedImages);
@@ -171,6 +184,12 @@ const UnifiedImagePicker = ({
       });
     } else {
       console.log('Image already exists in collection, not adding duplicate');
+      
+      Toast.show({
+        type: 'info',
+        text1: 'Duplicate Image',
+        text2: 'This image is already in your collection',
+      });
     }
   };
 
@@ -199,11 +218,21 @@ const UnifiedImagePicker = ({
       // Important: Store the image in images array BEFORE analysis
       // This ensures the properly formatted URI is used
       if (formattedUri) {
-        // Check if image already exists in the array
-        const imageExists = images.includes(formattedUri);
+        // More robust check for duplicate images
+        // We'll normalize all URIs for comparison to catch duplicates with different formatting
+        const isDuplicate = images.some(existingUri => {
+          // Normalize both URIs by removing file:// prefix for comparison
+          const normalizedExisting = existingUri.replace('file://', '');
+          const normalizedNew = formattedUri.replace('file://', '');
+          
+          // Compare the normalized paths
+          return normalizedExisting === normalizedNew;
+        });
+        
+        console.log('Duplicate image check result before analysis:', isDuplicate);
         let updatedImages = [...images];
         
-        if (!imageExists) {
+        if (!isDuplicate) {
           // Add the image to the collection using the formatted URI
           console.log('Adding image to collection BEFORE analysis:', formattedUri);
           updatedImages = [...images, formattedUri];
@@ -212,7 +241,7 @@ const UnifiedImagePicker = ({
           // Double check that the image was added
           console.log('Updated images array after adding:', updatedImages);
         } else {
-          console.log('Image already exists in collection, not adding duplicate');
+          console.log('Image already exists in collection, not adding duplicate before analysis');
         }
         
         // Safe to check now since updatedImages is defined in both branches
@@ -236,16 +265,62 @@ const UnifiedImagePicker = ({
         text2: 'Image analyzed and added to your item',
       });
     } catch (err) {
-      setError(`Analysis failed: ${err.message}`);
+      // Set a user-friendly error message that explains what happened
+      let userFriendlyError = 'Your image was successfully added, but we couldn\'t analyze it with AI.';
+      
+      // Add helpful suggestions based on the error type
+      if (err.message) {
+        if (err.message.includes('network')) {
+          userFriendlyError += ' This might be due to a network issue. Please check your internet connection and try again.';
+        } else if (err.message.includes('timeout')) {
+          userFriendlyError += ' The analysis took too long to complete. You can try again later when the service is less busy.';
+        } else if (err.message.includes('format') || err.message.includes('image')) {
+          userFriendlyError += ' The image format may not be supported. Try using a different image.';
+        }
+      }
+      
+      // Set the error message to display in the UI
+      setError(userFriendlyError);
       console.error('Error analyzing image:', err);
       
-      // Still add the image even if analysis fails
-      addImageToCollection(imageUri);
+      // Only add the image if it wasn't already added before the analysis
+      // Use the same robust duplicate check as elsewhere
+      const formattedErrorUri = ensureProperImageUri(imageUri);
       
+      if (formattedErrorUri) {
+        // Check if this image already exists using normalized paths
+        const isDuplicate = images.some(existingUri => {
+          const normalizedExisting = existingUri.replace('file://', '');
+          const normalizedNew = formattedErrorUri.replace('file://', '');
+          return normalizedExisting === normalizedNew;
+        });
+        
+        if (!isDuplicate) {
+          console.log('Adding image after analysis failure:', formattedErrorUri);
+          addImageToCollection(imageUri);
+        } else {
+          console.log('Image already exists in collection, not adding after analysis failure');
+        }
+      }
+      
+      // Create a more detailed error message for the user
+      let errorMessage = 'The image was added to your collection, but the AI couldn\'t analyze it.';
+      
+      // Add more specific details if available
+      if (err.message) {
+        if (err.message.includes('network')) {
+          errorMessage = 'The image was added, but we couldn\'t analyze it due to a network issue. Please check your connection.';
+        } else if (err.message.includes('timeout')) {
+          errorMessage = 'The image was added, but the analysis took too long. Please try again later.';
+        }
+      }
+      
+      // Show a more informative toast message
       Toast.show({
-        type: 'error',
-        text1: 'Analysis Failed',
-        text2: 'Image added, but AI analysis failed',
+        type: 'warning', // Changed from 'error' to 'warning' to indicate partial success
+        text1: 'Image Added, Analysis Failed',
+        text2: errorMessage,
+        visibilityTime: 5000, // Show for longer so user can read the message
       });
     } finally {
       setAnalyzing(false);
@@ -299,9 +374,12 @@ const UnifiedImagePicker = ({
       
       {/* Error Display */}
       {error && (
-        <Text style={[styles.errorText, { color: theme.colors.error }]}>
-          {error}
-        </Text>
+        <View style={styles.errorContainer}>
+          <Ionicons name="information-circle" size={20} color={theme.colors.warning} style={styles.errorIcon} />
+          <Text style={[styles.errorText, { color: theme.colors.warning }]}>
+            {error}
+          </Text>
+        </View>
       )}
       
       {/* Camera View Modal */}
@@ -484,9 +562,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.2,
   },
-  errorText: {
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 204, 0, 0.1)',
+    borderRadius: 8,
+    padding: 12,
     marginTop: 10,
-    textAlign: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 204, 0, 0.3)',
+  },
+  errorIcon: {
+    marginRight: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
   },
   loadingOverlay: {
     position: 'absolute',

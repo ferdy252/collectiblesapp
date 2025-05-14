@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import Constants from 'expo-constants';
+import { imageToBase64 } from './imageProcessingCache';
 
 // Get the Gemini API key from environment variables
 const getGeminiApiKey = () => {
@@ -28,81 +29,7 @@ const initializeGeminiClient = () => {
   return new GoogleGenerativeAI(apiKey);
 };
 
-/**
- * Convert an image URI to a base64 string
- * @param {string} uri - The image URI
- * @returns {Promise<string>} - A promise that resolves to the base64 string
- */
-const imageUriToBase64 = async (uri) => {
-  try {
-    // Log the URI being processed for debugging
-    console.log('CONVERTING IMAGE TO BASE64. Original URI:', uri);
-    
-    // Make sure we have a valid URI
-    if (!uri || typeof uri !== 'string') {
-      console.error('Invalid image URI provided to imageUriToBase64');
-      throw new Error('Invalid image URI provided');
-    }
-
-    // Try to fetch the image
-    console.log('Fetching image for base64 conversion...');
-    const response = await fetch(uri);
-    
-    if (!response.ok) {
-      console.error(`Failed to fetch image for base64 conversion: HTTP ${response.status}`);
-      throw new Error(`Failed to fetch image: HTTP ${response.status}`);
-    }
-    
-    // Convert to blob
-    const blob = await response.blob();
-    console.log('Image blob size for conversion:', blob.size, 'bytes');
-    
-    if (blob.size === 0) {
-      console.error('Image blob is empty (0 bytes)');
-      throw new Error('Image data is empty');
-    }
-    
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        try {
-          // Check if result exists and has expected format
-          if (!reader.result || typeof reader.result !== 'string') {
-            console.error('FileReader result is invalid:', reader.result);
-            reject(new Error('FileReader produced invalid result'));
-            return;
-          }
-          
-          // Remove the data URL prefix (e.g., 'data:image/jpeg;base64,')
-          const parts = reader.result.split(',');
-          if (parts.length < 2) {
-            console.error('FileReader result has unexpected format:', reader.result.substring(0, 50) + '...');
-            reject(new Error('FileReader result has unexpected format'));
-            return;
-          }
-          
-          const base64String = parts[1];
-          console.log('Base64 conversion successful. String length:', base64String.length);
-          resolve(base64String);
-        } catch (error) {
-          console.error('Error extracting base64 data:', error);
-          reject(error);
-        }
-      };
-      
-      reader.onerror = (error) => {
-        console.error('FileReader error:', error);
-        reject(error);
-      };
-      
-      // Start reading the blob as a data URL
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error('Error converting image to base64:', error);
-    throw error;
-  }
-};
+// Note: We're now using the cached imageToBase64 function from imageProcessingCache.js
 
 /**
  * Analyze an image using Google Gemini API to extract collectible information
@@ -110,15 +37,43 @@ const imageUriToBase64 = async (uri) => {
  * @returns {Promise<Object>} - A promise that resolves to the analysis results
  */
 const analyzeCollectibleImage = async (imageUri) => {
+  // Set a timeout for the analysis to prevent hanging
+  const ANALYSIS_TIMEOUT = 30000; // 30 seconds
+  let analysisTimer;
+  
   try {
+    // Create a promise that will reject after the timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      analysisTimer = setTimeout(() => {
+        reject(new Error('analysis timeout - The AI analysis took too long to complete. Please try again with a clearer image.'));
+      }, ANALYSIS_TIMEOUT);
+    });
+    
+    // Log the start of analysis with timestamp
+    console.log(`Starting AI analysis at ${new Date().toISOString()} for image: ${imageUri.substring(0, 50)}...`);
+    
     // Initialize the Gemini client
     const genAI = initializeGeminiClient();
+    if (!genAI) {
+      throw new Error('API key configuration - Could not initialize the AI service. Please check your configuration.');
+    }
     
     // Access the Gemini 1.5 Pro model
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
     
-    // Convert image to base64
-    const base64Image = await imageUriToBase64(imageUri);
+    // Convert image to base64 using our cached utility
+    let base64Image;
+    try {
+      base64Image = await imageToBase64(imageUri);
+      console.log(`Successfully converted image to base64, length: ${base64Image.length} characters`);
+      
+      if (!base64Image || base64Image.length < 100) {
+        throw new Error('invalid image data - The image could not be processed. Please try a different image.');
+      }
+    } catch (imageError) {
+      console.error('Error processing image for analysis:', imageError);
+      throw new Error(`image processing failed - ${imageError.message || 'Could not process the image for analysis'}`);
+    }
     
     // Prepare the prompt for collectible analysis
     const prompt = `You are a collectible item analyzer. Your task is to analyze the provided image of a collectible item.
@@ -141,34 +96,84 @@ Your response must be ONLY the JSON object with no additional text, markdown for
       },
     };
     
-    // Generate content with the image
-    const result = await model.generateContent([prompt, imagePart]);
-    const response = await result.response;
-    const text = response.text();
+    // Log the analysis request
+    console.log('Sending analysis request to Gemini API...');
     
-    // Clean the response text to ensure it's valid JSON
-    // Remove any markdown code block markers, extra spaces, or non-JSON text
-    const cleanedText = text.replace(/```json\s*|```\s*|^\s*\{|\}\s*$/g, '').trim();
-    const jsonText = cleanedText.startsWith('{') ? cleanedText : `{${cleanedText}`;
-    const finalJsonText = jsonText.endsWith('}') ? jsonText : `${jsonText}}`;
+    // Create the analysis promise
+    const analysisPromise = (async () => {
+      // Generate content with the image
+      const result = await model.generateContent([prompt, imagePart]);
+      const response = await result.response;
+      const text = response.text();
+      
+      console.log('Received response from Gemini API');
+      
+      // Clean the response text to ensure it's valid JSON
+      // Remove any markdown code block markers, extra spaces, or non-JSON text
+      const cleanedText = text.replace(/```json\s*|```\s*|^\s*\{|\}\s*$/g, '').trim();
+      const jsonText = cleanedText.startsWith('{') ? cleanedText : `{${cleanedText}`;
+      const finalJsonText = jsonText.endsWith('}') ? jsonText : `${jsonText}}`;
+      
+      // Parse the JSON response
+      try {
+        const parsedResult = JSON.parse(finalJsonText);
+        console.log('Successfully parsed JSON response from Gemini');
+        return parsedResult;
+      } catch (parseError) {
+        console.error('Error parsing Gemini response as JSON:', parseError);
+        console.log('Raw response:', text);
+        // If parsing fails, return a user-friendly object
+        return { 
+          rawResponse: text,
+          name: "Unknown Item",
+          category: "Other",
+          brand: "Unknown",
+          description: "Could not analyze the image properly. Please try again with a clearer image."
+        };
+      }
+    })();
     
-    // Parse the JSON response
-    try {
-      return JSON.parse(finalJsonText);
-    } catch (parseError) {
-      console.error('Error parsing Gemini response as JSON:', parseError);
-      // If parsing fails, return the raw text
-      return { 
-        rawResponse: text,
-        name: "Unknown Item",
-        category: "Other",
-        brand: "Unknown",
-        description: "Could not analyze the image properly. Please try again with a clearer image."
-      };
-    }
+    // Race the analysis promise against the timeout
+    const result = await Promise.race([analysisPromise, timeoutPromise]);
+    
+    // Clear the timeout since we got a result
+    clearTimeout(analysisTimer);
+    
+    // Log successful completion
+    console.log(`AI analysis completed successfully at ${new Date().toISOString()}`);
+    
+    return result;
   } catch (error) {
+    // Clear the timeout if there was an error
+    if (analysisTimer) clearTimeout(analysisTimer);
+    
+    // Log the error with details
     console.error('Error analyzing image with Gemini:', error);
-    throw error;
+    
+    // Categorize the error for better user feedback
+    let errorMessage = 'Could not analyze the image. Please try again.';
+    
+    if (error.message) {
+      if (error.message.includes('timeout')) {
+        errorMessage = 'The analysis took too long to complete. Please try again with a clearer image.';
+      } else if (error.message.includes('network') || error.message.includes('connection')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.message.includes('API key') || error.message.includes('configuration')) {
+        errorMessage = 'There is an issue with the AI service configuration. Please contact support.';
+      } else if (error.message.includes('quota') || error.message.includes('rate limit')) {
+        errorMessage = 'The AI analysis service is currently unavailable. Please try again later.';
+      } else if (error.message.includes('image')) {
+        errorMessage = 'There was a problem with the image. Please try a different image.';
+      }
+    }
+    
+    // Create a more descriptive error object
+    const enhancedError = new Error(errorMessage);
+    enhancedError.originalError = error;
+    enhancedError.timestamp = new Date().toISOString();
+    enhancedError.imageUri = imageUri ? `${imageUri.substring(0, 30)}...` : 'undefined';
+    
+    throw enhancedError;
   }
 };
 

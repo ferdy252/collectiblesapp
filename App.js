@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import HomeScreen from './screens/HomeScreen';
 import CollectionsScreen from './screens/CollectionsScreen';
-import AddItemScreen from './screens/AddItemScreen';
+import { AddItemScreen } from './screens/AddItem';
 import ItemDetailScreen from './screens/ItemDetailScreen';
 import FeedScreen from './screens/FeedScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -21,6 +21,7 @@ import WelcomeScreen from './screens/WelcomeScreen';
 import BarcodeScannerScreen from './screens/BarcodeScannerScreen';
 import StatisticsScreen from './screens/StatisticsScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
+import ImagePickerScreen from './screens/AddItem/ImagePickerScreen';
 import FeedbackHistoryScreen from './screens/FeedbackHistoryScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -133,6 +134,7 @@ function AddStack() {
     <Stack.Navigator screenOptions={screenOptions({ theme })}>
       <Stack.Screen name="AddMain" component={AddItemScreen} />
       <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
+      <Stack.Screen name="ImagePicker" component={ImagePickerScreen} />
     </Stack.Navigator>
   );
 }

@@ -143,12 +143,17 @@ const EditAccountScreen = ({ navigation }) => {
         throw error;
       }
       
-      // Get the public URL
-      const { data: urlData } = supabase.storage
+      // Get a signed URL (secure, requires authentication)
+      const { data: urlData, error: signedUrlError } = await supabase.storage
         .from('profiles')
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 60 * 60 * 24 * 365); // Valid for 1 year
       
-      return urlData.publicUrl;
+      if (signedUrlError || !urlData || !urlData.signedUrl) {
+        console.error('Failed to get signed URL for avatar:', signedUrlError);
+        throw new Error('Failed to get secure URL for avatar');
+      }
+      
+      return urlData.signedUrl;
     } catch (error) {
       console.error('Error uploading avatar:', error);
       Toast.show({

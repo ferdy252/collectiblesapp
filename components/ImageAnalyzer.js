@@ -9,11 +9,13 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { analyzeCollectibleImage } from '../utils/geminiImageAnalysis';
 import { useTheme } from '../context/ThemeContext';
 import { Typography } from '../theme/styled';
+import { normalizeImageUri, verifyImageExists } from '../utils/uriUtils';
 
 import CameraViewFix from './CameraViewFix';
 
@@ -32,22 +34,28 @@ const ImageAnalyzer = ({ onAnalysisComplete }) => {
   const handleImageCaptured = (imageUri) => {
     if (imageUri) {
       console.log('ImageAnalyzer received image URI:', imageUri);
-      setSelectedImage(imageUri);
-      setOriginalImageUri(imageUri); // Store the original URI
-      analyzeImage(imageUri);
+      
+      // Immediately format the URI for consistency using the unified utility
+      const formattedUri = normalizeImageUri(imageUri);
+      console.log('ImageAnalyzer formatted captured image URI:', formattedUri);
+      
+      // Update UI with the formatted URI
+      setSelectedImage(formattedUri);
+      
+      // Store the formatted URI
+      setOriginalImageUri(formattedUri);
+      
+      // Begin analysis with the properly formatted URI
+      analyzeImage(formattedUri);
+    } else {
+      console.error('Received empty image URI from camera');
+      Toast.show({
+        type: 'error',
+        text1: 'Camera Error',
+        text2: 'Failed to capture image. Please try again.',
+        visibilityTime: 3000,
+      });
     }
-  };
-  
-  // Helper function to ensure image URIs are properly formatted
-  const ensureProperImageUri = (uri) => {
-    if (!uri) return null;
-    
-    // Make sure the URI starts with 'file://' on iOS
-    if (Platform.OS === 'ios' && !uri.startsWith('file://')) {
-      return `file://${uri}`;
-    }
-    
-    return uri;
   };
 
   // Analyze the selected image using Google Gemini API
@@ -56,34 +64,81 @@ const ImageAnalyzer = ({ onAnalysisComplete }) => {
       setAnalyzing(true);
       setError(null);
       
-      // Ensure the URI is properly formatted
-      const formattedUri = ensureProperImageUri(imageUri);
+      // Validate the input URI
+      if (!imageUri) {
+        throw new Error('No image URI provided for analysis');
+      }
+      
+      // Ensure the URI is properly formatted using the unified utility
+      const formattedUri = normalizeImageUri(imageUri);
       console.log('ImageAnalyzer - Formatted URI for analysis:', formattedUri);
       
-      // Store the original URI to ensure we don't lose it
-      setOriginalImageUri(formattedUri);
+      // Verify the file exists at this URI using the unified utility
+      const fileExists = await verifyImageExists(formattedUri);
+      if (!fileExists) {
+        console.error('Image file does not exist at formatted URI:', formattedUri);
+        throw new Error('Image file not found');
+      }
       
-      // Show a user-friendly message
-      Alert.alert(
-        'Analyzing Image',
-        'The AI is analyzing your image. This may take a few seconds...'
-      );
+      console.log('Verified image file exists at:', formattedUri);
+      
+      // Store the formatted URI to ensure we don't lose it
+      setOriginalImageUri(formattedUri);
+      setSelectedImage(formattedUri); // Update the UI preview as well
+      
+      // No need for an alert - we'll show progress in the UI instead
+      // The analyzing state will trigger the loading overlay with progress indicators
       
       // Call the Gemini API to analyze the image
       const analysisResult = await analyzeCollectibleImage(formattedUri);
       
-      // Pass the analysis results and the ORIGINAL image URI to the parent component
+      // Pass the analysis results and the properly formatted image URI to the parent component
       if (onAnalysisComplete) {
         console.log('ImageAnalyzer - Passing URI to parent:', formattedUri);
         // Make sure we're explicitly passing the properly formatted image URI to be saved
         onAnalysisComplete(analysisResult, formattedUri);
       }
     } catch (err) {
-      setError('Could not analyze image. Please try again.');
       console.error('Error analyzing image:', err);
+      
+      // Determine the type of error for a more user-friendly message
+      let errorTitle = 'Analysis Failed';
+      let errorMessage = 'Could not analyze the image. Please try again or select a different image.';
+      
+      // Check for specific error types
+      if (err.message && err.message.includes('network')) {
+        errorTitle = 'Network Error';
+        errorMessage = 'Please check your internet connection and try again.';
+      } else if (err.message && err.message.includes('timeout')) {
+        errorTitle = 'Analysis Timeout';
+        errorMessage = 'The analysis is taking too long. Please try again with a clearer image.';
+      } else if (err.message && err.message.includes('file not found')) {
+        errorTitle = 'Image Not Found';
+        errorMessage = 'The selected image could not be accessed. Please try taking a new photo.';
+      } else if (err.message && err.message.includes('API key')) {
+        errorTitle = 'API Configuration Error';
+        errorMessage = 'There is an issue with the AI service configuration. Please contact support.';
+      } else if (err.message && err.message.includes('quota')) {
+        errorTitle = 'Service Limit Reached';
+        errorMessage = 'The AI analysis service is currently unavailable. Please try again later.';
+      }
+      
+      // Set the error state for UI display
+      setError(errorMessage);
+      
+      // Show a toast notification
+      Toast.show({
+        type: 'error',
+        text1: errorTitle,
+        text2: errorMessage,
+        visibilityTime: 4000,
+        position: 'bottom',
+      });
+      
+      // Also show an alert for more visibility
       Alert.alert(
-        'Analysis Failed',
-        'Could not analyze the image. Please try again or select a different image.',
+        errorTitle,
+        errorMessage,
         [{ text: 'OK' }]
       );
     } finally {
@@ -104,7 +159,20 @@ const ImageAnalyzer = ({ onAnalysisComplete }) => {
           {analyzing ? (
             <View style={[styles.loadingOverlay, { backgroundColor: theme.colors.background + 'CC' }]}>
               <ActivityIndicator size="large" color={theme.colors.primary} />
-              <Typography.Body style={styles.loadingText}>Analyzing image...</Typography.Body>
+              <Typography.H3 style={styles.loadingTitle}>AI Analysis in Progress</Typography.H3>
+              <Typography.Body style={styles.loadingText}>
+                Analyzing your image with AI...
+              </Typography.Body>
+              <View style={styles.loadingSteps}>
+                <Typography.Body style={styles.loadingStep}>✓ Image captured</Typography.Body>
+                <Typography.Body style={styles.loadingStep}>✓ Processing image</Typography.Body>
+                <Typography.Body style={styles.loadingStep}>
+                  <ActivityIndicator size="small" color={theme.colors.primary} /> AI analyzing details
+                </Typography.Body>
+              </View>
+              <Typography.Body style={styles.loadingNote}>
+                This may take up to 15-20 seconds depending on your internet connection
+              </Typography.Body>
             </View>
           ) : null}
         </View>
@@ -116,9 +184,20 @@ const ImageAnalyzer = ({ onAnalysisComplete }) => {
       )}
       
       {error ? (
-        <Typography.Body style={[styles.errorText, { color: theme.colors.error }]}>
-          {error}
-        </Typography.Body>
+        <View style={[styles.errorContainer, { backgroundColor: `${theme.colors.error}20` }]}>
+          <Ionicons name="alert-circle" size={24} color={theme.colors.error} />
+          <View style={styles.errorTextContainer}>
+            <Typography.Body style={[styles.errorText, { color: theme.colors.error }]}>
+              {error}
+            </Typography.Body>
+            <TouchableOpacity 
+              onPress={() => setError(null)}
+              style={styles.tryAgainButton}
+            >
+              <Text style={[styles.tryAgainText, { color: theme.colors.primary }]}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       ) : null}
       
       {/* Use the improved CameraViewFix component instead of direct buttons */}
@@ -144,6 +223,58 @@ const ImageAnalyzer = ({ onAnalysisComplete }) => {
 };
 
 const styles = StyleSheet.create({
+  loadingTitle: {
+    marginBottom: 8,
+    color: 'white',
+    textAlign: 'center',
+  },
+  loadingText: {
+    marginBottom: 15,
+    textAlign: 'center',
+    color: 'white',
+  },
+  loadingSteps: {
+    alignItems: 'flex-start',
+    marginBottom: 15,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    padding: 10,
+    borderRadius: 8,
+    width: '80%',
+  },
+  loadingStep: {
+    marginVertical: 4,
+    color: 'white',
+    fontSize: 14,
+  },
+  loadingNote: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 10,
+    width: '100%',
+  },
+  errorTextContainer: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  errorText: {
+    fontSize: 14,
+  },
+  tryAgainButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  tryAgainText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   resetButton: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -19,6 +19,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { supabase } from '../lib/supabase';
+import { fetchPhotosForItems } from './AddItem/apiUtils';
 import { useAuth } from '../context/AuthContext';
 import Toast from 'react-native-toast-message';
 import { RFPercentage } from 'react-native-responsive-fontsize';
@@ -71,6 +72,7 @@ const SearchScreen = ({ navigation }) => {
       setLoading(true);
       console.log('Fetching items from Supabase...');
       
+      // First fetch the items
       const { data, error } = await supabase
         .from('items')
         .select('*')
@@ -81,7 +83,24 @@ const SearchScreen = ({ navigation }) => {
       }
       
       console.log(`Fetched ${data.length} items successfully`);
-      setItems(data || []);
+      
+      if (data.length > 0) {
+        // Get all item IDs
+        const itemIds = data.map(item => item.id);
+        
+        // Fetch photos for all items in a single request
+        const photosByItem = await fetchPhotosForItems(itemIds);
+        
+        // Add photos to each item
+        const itemsWithPhotos = data.map(item => ({
+          ...item,
+          photos: photosByItem[item.id] || []
+        }));
+        
+        setItems(itemsWithPhotos);
+      } else {
+        setItems(data || []);
+      }
     } catch (error) {
       console.error('Error fetching items:', error.message);
       Toast.show({

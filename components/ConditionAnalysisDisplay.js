@@ -11,8 +11,11 @@ import AiFeedbackComponent from './AiFeedbackComponent';
 
 /**
  * Component to display the condition analysis results from the Gemini API
+ * @param {Object} conditionData - The condition analysis data from the AI
+ * @param {number} itemId - The ID of the item being analyzed
+ * @param {string} analyzedImageUri - The URI of the image that was analyzed
  */
-const ConditionAnalysisDisplay = ({ conditionData, itemId }) => {
+const ConditionAnalysisDisplay = ({ conditionData, itemId, analyzedImageUri }) => {
   const { theme } = useTheme();
   
   if (!conditionData) {
@@ -73,8 +76,12 @@ const ConditionAnalysisDisplay = ({ conditionData, itemId }) => {
         </View>
       ) : null}
       
-      {/* Add the feedback component */}
-      <AiFeedbackComponent itemId={itemId} analysisData={conditionData} />
+      {/* Add the feedback component with the analyzed image URI */}
+      <AiFeedbackComponent
+        itemId={itemId}
+        analysisData={conditionData}
+        analyzedImageUri={analyzedImageUri}
+      />
     </Card>
   );
 };

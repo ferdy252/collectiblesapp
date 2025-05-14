@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,9 +17,59 @@ import Toast from 'react-native-toast-message';
 /**
  * Component for collecting user feedback on AI condition analysis
  */
-const AiFeedbackComponent = ({ itemId, analysisData }) => {
+const AiFeedbackComponent = ({ itemId, analysisData, analyzedImageUri }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const [photoId, setPhotoId] = useState(null);
+  
+  // Find the photo ID for the analyzed image
+  useEffect(() => {
+    const findPhotoId = async () => {
+      if (!itemId || !analyzedImageUri) return;
+      
+      try {
+        console.log('Looking for photo ID for analyzed image:', analyzedImageUri);
+        
+        // Extract the filename from the URI to help with matching
+        const filename = analyzedImageUri.split('/').pop();
+        console.log('Extracted filename:', filename);
+        
+        // Query the item_photos table to find the matching photo
+        const { data, error } = await supabase
+          .from('item_photos')
+          .select('id, photo_url')
+          .eq('item_id', itemId)
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('Error finding photo ID:', error);
+          return;
+        }
+        
+        if (data && data.length > 0) {
+          // Try to find an exact match first
+          let matchedPhoto = data.find(photo => photo.photo_url === analyzedImageUri);
+          
+          // If no exact match, try to find a photo URL that contains the filename
+          if (!matchedPhoto && filename) {
+            matchedPhoto = data.find(photo => photo.photo_url.includes(filename));
+          }
+          
+          // If we found a match, store the photo ID
+          if (matchedPhoto) {
+            console.log('Found matching photo ID:', matchedPhoto.id);
+            setPhotoId(matchedPhoto.id);
+          } else {
+            console.log('No matching photo found for analyzed image');
+          }
+        }
+      } catch (error) {
+        console.error('Error in findPhotoId:', error);
+      }
+    };
+    
+    findPhotoId();
+  }, [itemId, analyzedImageUri]);
   
   // State variables
   const [rating, setRating] = useState(null); // null, true (thumbs up), false (thumbs down)
@@ -55,11 +105,14 @@ const AiFeedbackComponent = ({ itemId, analysisData }) => {
       const feedbackData = {
         user_id: user.id,
         item_id: itemId,
+        photo_id: photoId, // Include the photo ID if we found it
         rating: rating,
         feedback_text: feedbackText.trim() || null,
         ai_model_used: 'gemini-1.5-pro', // Current model being used
         analysis_data: analysisData
       };
+      
+      console.log('Saving AI feedback with photo ID:', photoId);
       
       // Insert feedback into Supabase
       const { error } = await supabase

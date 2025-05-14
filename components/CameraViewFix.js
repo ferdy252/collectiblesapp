@@ -125,12 +125,25 @@ const CameraViewFix = ({ onImageCaptured }) => {
   const formatImageUri = (uri) => {
     if (!uri) return null;
     
-    // Make sure the URI starts with 'file://' on iOS
-    if (Platform.OS === 'ios' && !uri.startsWith('file://')) {
-      return `file://${uri}`;
+    // Log the original URI for debugging
+    console.log('CameraViewFix - Original URI:', uri);
+    
+    // Handle different URI formats consistently across platforms
+    let formattedUri = uri;
+    
+    // First, normalize by removing any existing 'file://' prefix
+    if (formattedUri.startsWith('file://')) {
+      formattedUri = formattedUri.substring(7);
     }
     
-    return uri;
+    // For iOS: Always ensure the URI starts with 'file://'
+    // For Android: Use the URI without 'file://' prefix
+    if (Platform.OS === 'ios') {
+      formattedUri = `file://${formattedUri}`;
+    }
+    
+    console.log('CameraViewFix - Formatted URI:', formattedUri);
+    return formattedUri;
   };
 
   return (

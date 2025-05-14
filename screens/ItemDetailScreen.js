@@ -43,6 +43,8 @@ function ItemDetailScreen({ route, navigation }) {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [itemPhotos, setItemPhotos] = useState([]);
+  const [analyzedImageUri, setAnalyzedImageUri] = useState(null);
   const isFocused = useIsFocused();
   const screenWidth = Dimensions.get('window').width;
   
@@ -76,6 +78,44 @@ function ItemDetailScreen({ route, navigation }) {
       }
     } catch (error) {
       console.error('Error loading AI settings:', error);
+    }
+  };
+
+  // Fetch photos for the item from the item_photos table
+  const fetchItemPhotos = async (itemId) => {
+    try {
+      console.log(`Fetching photos for item ID: ${itemId}`);
+      
+      const { data, error } = await supabase
+        .from('item_photos')
+        .select('*')
+        .eq('item_id', itemId)
+        .order('display_order', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching item photos:', error);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        console.log(`Fetched ${data.length} photos for item`);
+        
+        // Extract just the photo URLs
+        const photoUrls = data.map(photo => photo.photo_url);
+        setItemPhotos(photoUrls);
+        
+        // If there's condition analysis data, try to find the analyzed image
+        if (data[0] && data[0].photo_url) {
+          // For now, we'll assume the first photo was analyzed
+          // In a more complete solution, we would store which photo was analyzed
+          setAnalyzedImageUri(data[0].photo_url);
+        }
+      } else {
+        console.log('No photos found for this item');
+        setItemPhotos([]);
+      }
+    } catch (error) {
+      console.error('Error in fetchItemPhotos:', error);
     }
   };
 
@@ -150,6 +190,9 @@ function ItemDetailScreen({ route, navigation }) {
       if (data) {
         console.log('Item details fetched:', data);
         setItem(data);
+        
+        // Fetch photos for this item from the item_photos table
+        fetchItemPhotos(itemId);
       } else {
         // Use our error handling utility
         handleError(
@@ -206,6 +249,37 @@ function ItemDetailScreen({ route, navigation }) {
     );
   };
 
+  // Helper function to delete images from storage
+  const deleteImagesFromStorage = async (imageUrls) => {
+    if (!imageUrls || !imageUrls.length) return;
+    
+    console.log('Cleaning up associated images:', imageUrls.length);
+    try {
+      for (const imageUrl of imageUrls) {
+        // Extract the file name from the URL
+        const fileName = imageUrl.split('/').pop();
+        if (!fileName) continue;
+        
+        console.log(`Attempting to delete image: ${fileName}`);
+        
+        const { error } = await supabase.storage
+          .from('item-photos')
+          .remove([fileName]);
+          
+        if (error) {
+          console.error(`Error deleting image ${fileName}:`, error);
+        } else {
+          console.log(`Successfully deleted image: ${fileName}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error cleaning up images:', error);
+      // We don't throw here to avoid interrupting the item deletion flow
+      // Just log the error and continue
+    }
+  };
+  
+  // Delete the item and associated images
   const deleteItem = async () => {
     try {
       // Reset error state
@@ -214,6 +288,27 @@ function ItemDetailScreen({ route, navigation }) {
       setDeleting(true);
       console.log(`Deleting item with ID: ${itemId}`);
       
+      // First, get the photos from our local state or fetch them if needed
+      let photosToDelete = itemPhotos;
+      
+      if (!photosToDelete || photosToDelete.length === 0) {
+        // Try to fetch photos from the item_photos table if we don't have them locally
+        console.log('Fetching photos for deletion...');
+        const { data: photoData, error: photoError } = await supabase
+          .from('item_photos')
+          .select('photo_url')
+          .eq('item_id', itemId);
+        
+        if (photoError) {
+          console.error('Error fetching photos for deletion:', photoError);
+        } else if (photoData && photoData.length > 0) {
+          photosToDelete = photoData.map(photo => photo.photo_url);
+          console.log(`Found ${photosToDelete.length} photos to delete`);
+        }
+      }
+      
+      // Delete the item from the database
+      // This will automatically delete related photos from item_photos table due to CASCADE constraint
       const { error } = await supabase
         .from('items')
         .delete()
@@ -222,11 +317,17 @@ function ItemDetailScreen({ route, navigation }) {
       if (error) {
         throw error;
       }
-
+      
+      // Clean up the associated images from storage if we have them
+      if (photosToDelete && photosToDelete.length > 0) {
+        console.log(`Deleting ${photosToDelete.length} photos from storage`);
+        await deleteImagesFromStorage(photosToDelete);
+      }
+      
       Toast.show({
         type: 'success',
         text1: 'Item Deleted',
-        text2: 'Item successfully deleted',
+        text2: 'Item and associated images successfully deleted',
       });
       navigation.goBack();
     } catch (error) {
@@ -249,7 +350,7 @@ function ItemDetailScreen({ route, navigation }) {
   // Analyze item condition using Gemini API
   const analyzeCondition = async () => {
     try {
-      if (!item || !item.images || item.images.length === 0) {
+      if (!item || !itemPhotos || itemPhotos.length === 0) {
         Alert.alert(
           'No Images Available',
           'This item has no images to analyze. Please add at least one image.',
@@ -280,7 +381,7 @@ function ItemDetailScreen({ route, navigation }) {
       setHasError(false);
       
       // Use the first image for analysis
-      const imageUri = item.images[0];
+      const imageUri = itemPhotos[0];
       
       // Call the Gemini API to analyze the condition
       const analysisResult = await analyzeItemCondition(
@@ -446,7 +547,7 @@ function ItemDetailScreen({ route, navigation }) {
         >
           {/* Photo Gallery */}
           <View style={[styles.imageContainer, { backgroundColor: theme.colors.surface }]}>
-            {item?.images && Array.isArray(item.images) && item.images.length > 0 ? (
+            {itemPhotos && itemPhotos.length > 0 ? (
               <View>
                 <ScrollView
                   horizontal
@@ -459,7 +560,7 @@ function ItemDetailScreen({ route, navigation }) {
                   }}
                   scrollEventThrottle={16}
                 >
-                  {item.images.map((photo, index) => (
+                  {itemPhotos.map((photo, index) => (
                     <Image
                       key={index}
                       source={{ uri: photo }}
@@ -468,9 +569,9 @@ function ItemDetailScreen({ route, navigation }) {
                     />
                   ))}
                 </ScrollView>
-                {item.images.length > 1 && (
+                {itemPhotos.length > 1 && (
                   <View style={styles.dotsContainer}>
-                    {item.images.map((_, index) => (
+                    {itemPhotos.map((_, index) => (
                       <View
                         key={index}
                         style={[
@@ -586,7 +687,11 @@ function ItemDetailScreen({ route, navigation }) {
           
           {/* Condition Analysis Section */}
           {item?.condition_analysis ? (
-            <ConditionAnalysisDisplay conditionData={item.condition_analysis} itemId={item.id} />
+            <ConditionAnalysisDisplay 
+              conditionData={item.condition_analysis} 
+              itemId={item.id} 
+              analyzedImageUri={analyzedImageUri}
+            />
           ) : (
             <Card.Primary style={[styles.conditionCard, { backgroundColor: theme.colors.surface }]}>
               <Typography.H3 style={[styles.conditionTitle, { color: theme.colors.text }]}>

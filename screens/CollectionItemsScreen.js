@@ -6,17 +6,18 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
-  Alert,
-  SafeAreaView,
+  RefreshControl,
   ActivityIndicator,
-  Dimensions,
+  Alert,
   Animated,
+  Dimensions,
   StatusBar,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../lib/supabase';
+import { fetchPhotosForItems } from './AddItem/apiUtils';
 import { useTheme } from '../context/ThemeContext';
 import { Typography, Button, Card, Layout, createThemedStyles } from '../theme/styled';
 
@@ -54,6 +55,7 @@ const CollectionItemsScreen = ({ route, navigation }) => {
       setLoading(true);
       console.log(`Fetching items for collection ID: ${collectionId}`);
       
+      // First fetch the items
       const { data, error } = await supabase
         .from('items')
         .select('*')
@@ -65,7 +67,24 @@ const CollectionItemsScreen = ({ route, navigation }) => {
       }
       
       console.log(`Fetched ${data.length} items for collection`);
-      setItems(data);
+      
+      if (data.length > 0) {
+        // Get all item IDs
+        const itemIds = data.map(item => item.id);
+        
+        // Fetch photos for all items in a single request
+        const photosByItem = await fetchPhotosForItems(itemIds);
+        
+        // Add photos to each item
+        const itemsWithPhotos = data.map(item => ({
+          ...item,
+          photos: photosByItem[item.id] || []
+        }));
+        
+        setItems(itemsWithPhotos);
+      } else {
+        setItems(data);
+      }
     } catch (error) {
       console.error('Error fetching items:', error.message);
       Toast.show({
@@ -92,6 +111,41 @@ const CollectionItemsScreen = ({ route, navigation }) => {
   };
   
   // Function to delete an item
+  // Helper function to delete images from storage
+  const deleteImagesFromStorage = async (imageUrls) => {
+    if (!imageUrls || !imageUrls.length) return;
+    
+    console.log('Cleaning up associated images:', imageUrls.length);
+    
+    try {
+      // Extract filenames from the image URLs
+      const fileNames = imageUrls.map(url => {
+        // Handle both signed and public URLs
+        // Extract the filename from the URL path
+        const urlParts = url.split('/');
+        return urlParts[urlParts.length - 1].split('?')[0]; // Remove query parameters if present
+      });
+      
+      console.log('Deleting image files:', fileNames);
+      
+      // Delete each file from storage
+      for (const fileName of fileNames) {
+        const { error } = await supabase.storage
+          .from('item-photos')
+          .remove([fileName]);
+          
+        if (error) {
+          console.error(`Error deleting image ${fileName}:`, error);
+        } else {
+          console.log(`Successfully deleted image: ${fileName}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error cleaning up images:', error);
+      // We don't throw here to avoid interrupting the item deletion flow
+    }
+  };
+
   const deleteItem = async (itemId, itemName) => {
     Alert.alert(
       'Delete Item',
@@ -109,6 +163,19 @@ const CollectionItemsScreen = ({ route, navigation }) => {
               setDeletingItemId(itemId);
               console.log(`Deleting item with ID: ${itemId}`);
               
+              // First, get the item details to retrieve the image URLs
+              const { data: itemData, error: fetchError } = await supabase
+                .from('items')
+                .select('photos')
+                .eq('id', itemId)
+                .single();
+              
+              if (fetchError) {
+                console.error('Error fetching item details for cleanup:', fetchError);
+                // Continue with deletion even if we can't get the photos
+              }
+              
+              // Delete the item from the database
               const { error } = await supabase
                 .from('items')
                 .delete()
@@ -118,13 +185,18 @@ const CollectionItemsScreen = ({ route, navigation }) => {
                 throw error;
               }
               
+              // Clean up the associated images if we have them
+              if (itemData && itemData.photos && itemData.photos.length > 0) {
+                await deleteImagesFromStorage(itemData.photos);
+              }
+              
               // Remove the item from state
               setItems(items.filter(item => item.id !== itemId));
               
               Toast.show({
                 type: 'success',
                 text1: 'Item Deleted',
-                text2: `${itemName} has been deleted.`,
+                text2: `${itemName} and its images have been deleted.`,
               });
             } catch (error) {
               console.error('Error deleting item:', error.message);

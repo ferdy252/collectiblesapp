@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import DropDownPicker from 'react-native-dropdown-picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../lib/supabase';
@@ -403,32 +404,59 @@ function EditItemScreen({ route, navigation }) {
       setLoading(true);
       console.log('Uploading image to item-photos bucket...');
       
-      // Convert image to blob
-      const response = await fetch(uri);
+      // Resize and compress the image before uploading
+      console.log('Optimizing image before upload...');
+      
+      // Define optimal image dimensions and compression
+      const MAX_WIDTH = 1200;  // Max width in pixels
+      const MAX_HEIGHT = 1200; // Max height in pixels
+      const COMPRESSION = 0.8; // 80% quality (good balance between quality and file size)
+      
+      // Process the image with ImageManipulator
+      const processedImage = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: MAX_WIDTH, height: MAX_HEIGHT } }], // Resize while maintaining aspect ratio
+        {
+          compress: COMPRESSION,
+          format: ImageManipulator.SaveFormat.JPEG
+        }
+      );
+      
+      console.log('Image optimized successfully');
+      
+      // Use the optimized image URI for upload
+      const optimizedUri = processedImage.uri;
+      
+      // Convert optimized image to blob
+      const response = await fetch(optimizedUri);
       const blob = await response.blob();
       
-      // Generate a unique filename
-      const fileExt = uri.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      // Generate a unique filename - always use jpg extension since we converted to JPEG
+      const fileName = `${user.id}-${Date.now()}.jpg`;
       const filePath = `${fileName}`;
       
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('item-photos')
         .upload(filePath, blob, {
-          contentType: `image/${fileExt}`,
+          contentType: 'image/jpeg', // Always JPEG since we converted the image
           upsert: true,
         });
       
       if (error) throw error;
       
-      // Get public URL
-      const { data: urlData } = supabase.storage
+      // Get a signed URL (secure, requires authentication)
+      const { data: urlData, error: signedUrlError } = await supabase.storage
         .from('item-photos')
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 60 * 60 * 24 * 365); // Valid for 1 year
       
-      console.log('Image uploaded successfully:', urlData.publicUrl);
-      return urlData.publicUrl;
+      if (signedUrlError || !urlData || !urlData.signedUrl) {
+        console.error('Failed to get signed URL:', signedUrlError);
+        throw new Error('Failed to get secure URL for image');
+      }
+      
+      console.log('Image uploaded successfully:', urlData.signedUrl);
+      return urlData.signedUrl;
     } catch (error) {
       // Use our error handling utility
       handleError(

@@ -196,19 +196,24 @@ const SettingsScreen = ({ navigation, route }) => {
 
       if (uploadError) throw uploadError;
 
-      // Get a public URL for the file
-      const { data: publicUrlData } = await supabase
+      // Get a signed URL for the file (secure, requires authentication)
+      const { data: signedUrlData, error: signedUrlError } = await supabase
         .storage
         .from('user-data')
-        .getPublicUrl(uploadPath);
+        .createSignedUrl(uploadPath, 60 * 60 * 24); // Valid for 24 hours for export data
+      
+      if (signedUrlError) {
+        console.error('Failed to get signed URL for export data:', signedUrlError);
+        throw new Error('Failed to create secure download link');
+      }
 
-      const publicUrl = publicUrlData?.publicUrl;
+      const secureUrl = signedUrlData?.signedUrl;
 
       // Share the file URL
       try {
         await Share.share({
-          message: `Here's your exported items data from CollectibleTrackerApp: ${publicUrl}`,
-          url: publicUrl,
+          message: `Here's your exported items data from CollectibleTrackerApp: ${secureUrl}`,
+          url: secureUrl,
           title: 'Your Exported Data',
         });
         
