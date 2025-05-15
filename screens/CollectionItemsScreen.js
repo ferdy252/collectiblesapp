@@ -328,7 +328,6 @@ const CollectionItemsScreen = ({ route, navigation }) => {
             style={{ flex: 1 }}
             onPress={() => handleItemTap(item)}
             activeOpacity={0.8}
-            delayPressIn={0}
           >
             <Image 
               source={{ uri: photoUrl }} 
@@ -386,6 +385,7 @@ const CollectionItemsScreen = ({ route, navigation }) => {
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
+          delayLongPress={10000}
         >
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>

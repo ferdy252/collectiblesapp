@@ -411,6 +411,7 @@ const createTheme = (isDark = false) => {
       },
       buttonPress: {
         duration: 150, // 150ms for button press animations
+        scale: 0.95, // Scale factor for button press effect (slightly smaller)
       },
       transition: {
         duration: 300, // 300ms for general transitions

@@ -46,6 +46,7 @@ function EditItemScreen({ route, navigation }) {
   const [selectedCondition, setSelectedCondition] = useState(CONDITIONS[0]); // Default to Mint
   const [brand, setBrand] = useState('');
   const [images, setImages] = useState([]);
+  const [originalImages, setOriginalImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingItem, setLoadingItem] = useState(true);
   const [collections, setCollections] = useState([]);
@@ -77,6 +78,44 @@ function EditItemScreen({ route, navigation }) {
     fetchCollections();
   }, []);
 
+  // Function to fetch photos for the item from the item_photos table
+  const fetchItemPhotos = async (itemId) => {
+    try {
+      console.log(`Fetching photos for item ID: ${itemId}`);
+      
+      const { data, error } = await supabase
+        .from('item_photos')
+        .select('image_id, display_order, images(url)')
+        .eq('item_id', itemId)
+        .order('display_order', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching item photos:', error);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        console.log(`Fetched ${data.length} photos for item`);
+        
+        // Extract just the photo URLs
+        const photoUrls = data.map(photo => photo.images?.url).filter(url => url);
+        console.log('Photo URLs:', photoUrls);
+        
+        // Set both the current images and original images
+        setImages(photoUrls);
+        setOriginalImages(photoUrls);
+      } else {
+        console.log('No photos found for this item');
+        setImages([]);
+        setOriginalImages([]);
+      }
+    } catch (error) {
+      console.error('Error in fetchItemPhotos:', error);
+    } finally {
+      setLoadingItem(false);
+    }
+  };
+
   // Function to fetch the item details from Supabase
   const fetchItemDetails = async () => {
     try {
@@ -102,12 +141,14 @@ function EditItemScreen({ route, navigation }) {
         setItemName(data.name || '');
         setSelectedCategory(data.category || CATEGORIES[0]);
         setBrand(data.brand || '');
-        setImages(data.photos || []);
         setSelectedCollectionId(data.collection_id ? String(data.collection_id) : ''); // Convert to string
         setIsShared(data.is_shared || false);
         setSelectedCondition(data.condition || CONDITIONS[0]); // Set condition from data
         setValue(data.value ? data.value.toString() : '0.00'); // Set value from data
         setNotes(data.notes || ''); // Set notes from data
+        
+        // Fetch photos from item_photos table
+        fetchItemPhotos(itemId);
       } else {
         // Use our error handling utility
         handleError(
@@ -348,9 +389,8 @@ function EditItemScreen({ route, navigation }) {
         collection_id: selectedCollectionId,
         is_shared: isShared,
         value: value ? parseFloat(value) : 0,
-        notes: sanitizeString(notes),
-        photos: processedImages.length > 0 ? processedImages : null,
-        // updated_at field removed - column doesn't exist in the database schema
+        notes: sanitizeString(notes)
+        // Removed 'photos' field - it doesn't exist in the items table
       };
       
       console.log('Sanitized data ready for update:', sanitizedData);
@@ -366,6 +406,12 @@ function EditItemScreen({ route, navigation }) {
         throw error;
       } else {
         console.log('Item updated successfully:', data);
+        
+        // Now handle the photos separately
+        if (processedImages.length > 0) {
+          await updateItemPhotos(itemId, processedImages, originalImages);
+        }
+        
         Toast.show({
           type: 'success',
           text1: 'Item Updated!',
@@ -394,6 +440,152 @@ function EditItemScreen({ route, navigation }) {
 
   const handleCancel = () => {
     navigation.goBack();
+  };
+
+  // Function to update item photos in the database
+  const updateItemPhotos = async (itemId, newPhotoUrls, originalPhotoUrls) => {
+    try {
+      console.log(`Updating photos for item ${itemId}`);
+      console.log(`New photos: ${newPhotoUrls.length}, Original photos: ${originalPhotoUrls.length}`);
+      
+      // Identify which photos are new (need to be added) and which are removed (need to be deleted)
+      const addedPhotos = newPhotoUrls.filter(url => !url.startsWith('http') || !originalPhotoUrls.includes(url));
+      const keptPhotos = newPhotoUrls.filter(url => url.startsWith('http') && originalPhotoUrls.includes(url));
+      const removedPhotos = originalPhotoUrls.filter(url => !newPhotoUrls.includes(url));
+      
+      console.log(`Photos to add: ${addedPhotos.length}, Photos to keep: ${keptPhotos.length}, Photos to remove: ${removedPhotos.length}`);
+      
+      // Step 1: Handle removed photos - delete from item_photos table
+      if (removedPhotos.length > 0) {
+        // First, get the image_ids for the removed photos
+        for (const photoUrl of removedPhotos) {
+          // Extract filename from URL to help identify the image
+          const fileName = photoUrl.split('/').pop().split('?')[0];
+          
+          // Find the image record
+          const { data: imageData, error: imageError } = await supabase
+            .from('images')
+            .select('id')
+            .eq('file_name', fileName)
+            .limit(1);
+          
+          if (imageError) {
+            console.error('Error finding image to remove:', imageError);
+            continue;
+          }
+          
+          if (imageData && imageData.length > 0) {
+            const imageId = imageData[0].id;
+            
+            // Delete the relationship in item_photos
+            const { error: deleteError } = await supabase
+              .from('item_photos')
+              .delete()
+              .eq('item_id', itemId)
+              .eq('image_id', imageId);
+            
+            if (deleteError) {
+              console.error('Error removing photo relationship:', deleteError);
+            } else {
+              console.log(`Successfully removed photo relationship for image ${imageId}`);
+            }
+          }
+        }
+      }
+      
+      // Step 2: Handle added photos - add to images table and item_photos table
+      if (addedPhotos.length > 0) {
+        // First, create entries in the images table and get their IDs
+        const imageInsertPromises = addedPhotos.map(async (url) => {
+          // If it's a local URI, it needs to be uploaded first
+          if (!url.startsWith('http')) {
+            const uploadedUrl = await uploadImage(url);
+            if (!uploadedUrl) return { url, image_id: null };
+            url = uploadedUrl;
+          }
+          
+          // Extract filename from URL
+          const fileName = url.split('/').pop().split('?')[0];
+          
+          // Insert into images table
+          const { data: imageData, error: imageError } = await supabase
+            .from('images')
+            .insert([
+              {
+                url: url,
+                storage_path: `item-photos/${fileName}`,
+                file_name: fileName,
+                file_type: fileName.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
+                created_by: user.id
+              }
+            ])
+            .select();
+          
+          if (imageError) {
+            console.error('Error saving image:', imageError);
+            return { url, image_id: null };
+          }
+          
+          return { url, image_id: imageData[0].id };
+        });
+        
+        const imageResults = await Promise.all(imageInsertPromises);
+        
+        // Get the current highest display_order for this item
+        const { data: currentPhotos, error: orderError } = await supabase
+          .from('item_photos')
+          .select('display_order')
+          .eq('item_id', itemId)
+          .order('display_order', { ascending: false })
+          .limit(1);
+        
+        let startOrder = 0;
+        if (!orderError && currentPhotos && currentPhotos.length > 0) {
+          startOrder = currentPhotos[0].display_order + 1;
+        }
+        
+        // Prepare photo data for batch insert
+        const photoData = imageResults.map((result, index) => ({
+          item_id: itemId,
+          image_id: result.image_id,
+          display_order: startOrder + index
+        }));
+        
+        // Filter out any failed image inserts
+        const validPhotoData = photoData.filter(data => data.image_id !== null);
+        
+        if (validPhotoData.length > 0) {
+          const { data: photoInsertData, error: photoError } = await supabase
+            .from('item_photos')
+            .insert(validPhotoData)
+            .select();
+          
+          if (photoError) {
+            console.error('Error saving photos:', photoError);
+            // We don't throw here to avoid losing the item update if photos fail
+            Toast.show({
+              type: 'error',
+              text1: 'Warning',
+              text2: 'Some photos may not have been saved properly',
+              position: 'bottom',
+            });
+          } else {
+            console.log('Photos saved successfully:', photoInsertData);
+          }
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating photos:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Warning',
+        text2: 'Some photos may not have been updated properly',
+        position: 'bottom',
+      });
+      return false;
+    }
   };
 
   // Function to upload avatar to storage
@@ -752,10 +944,7 @@ function EditItemScreen({ route, navigation }) {
                 </TouchableOpacity>
               </View>
             ))}
-            {/* Placeholder boxes for empty slots */}
-            {Array.from({ length: Math.max(0, 3 - images.length) }).map((_, index) => (
-              <View key={`placeholder-${index}`} style={[styles.thumbnailContainer, styles.placeholderThumbnail]} />
-            ))}
+            {/* Removed placeholder boxes for empty slots */}
           </View>
         )}
 

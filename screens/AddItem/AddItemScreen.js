@@ -304,8 +304,17 @@ const AddItemScreenContent = ({ navigation, route }) => {
       // Clear the image processing cache after successful save
       clearImageCache();
       
-      // Navigate back to the previous screen
-      navigation.goBack();
+      // Reset the form instead of navigating back
+      dispatch({ type: ACTIONS.RESET_FORM });
+      
+      // Show success message
+      Toast.show({
+        type: 'success',
+        text1: 'Item Added Successfully',
+        text2: 'Form has been reset for your next item',
+        position: 'bottom',
+        visibilityTime: 2000,
+      });
       
     } catch (error) {
       // Handle any errors that occur during the save process

@@ -503,11 +503,12 @@ function ItemDetailScreen({ route, navigation }) {
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Header */}
         <Layout.Row style={[styles.header, { backgroundColor: theme.colors.surface }]}>
-          <Button.Icon
-            icon={<Ionicons name="arrow-back" size={24} color={theme.colors.text} />}
-            onPress={handleBackPress}
+          <TouchableOpacity
             style={styles.headerButton}
-          />
+            onPress={handleBackPress}
+          >
+            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
           <Typography.H2 style={[styles.headerTitle, { color: theme.colors.text }]}>
             {item?.name || 'Item Details'}
           </Typography.H2>
