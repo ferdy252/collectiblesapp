@@ -341,21 +341,28 @@ export const Card = {
     
     // Create animated style
     const animatedStyle = useAnimatedStyle(() => {
+      // Add safety check for scale.value
       return {
-        transform: [{ scale: scale.value }]
+        transform: scale && scale.value !== undefined ? [{ scale: scale.value }] : [{ scale: 1 }]
       };
     });
     
     // Handle press animations
     const handlePressIn = () => {
-      scale.value = withTiming(
-        theme.animations.buttonPress.scale,
-        { duration: theme.animations.buttonPress.duration }
-      );
+      // Add safety check before animating
+      if (scale && typeof scale.value !== 'undefined') {
+        scale.value = withTiming(
+          theme.animations.buttonPress.scale,
+          { duration: theme.animations.buttonPress.duration }
+        );
+      }
     };
     
     const handlePressOut = () => {
-      scale.value = withTiming(1, { duration: theme.animations.buttonPress.duration });
+      // Add safety check before animating
+      if (scale && typeof scale.value !== 'undefined') {
+        scale.value = withTiming(1, { duration: theme.animations.buttonPress.duration });
+      }
     };
     
     // Use Pressable instead of TouchableOpacity to have more control over gestures
