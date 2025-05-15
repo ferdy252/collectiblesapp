@@ -31,16 +31,7 @@ export const validateForm = (formData) => {
     return false;
   }
   
-  // Check if collection is selected
-  if (!selectedCollection) {
-    Toast.show({
-      type: 'error',
-      text1: 'Collection Required',
-      text2: 'Please select a collection for your item',
-      position: 'bottom',
-    });
-    return false;
-  }
+  // Collection is now optional, so we don't check for it here
   
   return true;
 };

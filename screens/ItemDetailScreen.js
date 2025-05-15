@@ -88,27 +88,24 @@ function ItemDetailScreen({ route, navigation }) {
       
       const { data, error } = await supabase
         .from('item_photos')
-        .select('*')
+        .select('image_id, display_order, images(url)')
         .eq('item_id', itemId)
         .order('display_order', { ascending: true });
       
       if (error) {
         console.error('Error fetching item photos:', error);
-        return;
-      }
-      
-      if (data && data.length > 0) {
+      } else if (data && data.length > 0) {
         console.log(`Fetched ${data.length} photos for item`);
         
         // Extract just the photo URLs
-        const photoUrls = data.map(photo => photo.photo_url);
+        const photoUrls = data.map(photo => photo.images?.url);
         setItemPhotos(photoUrls);
         
         // If there's condition analysis data, try to find the analyzed image
-        if (data[0] && data[0].photo_url) {
+        if (data[0] && data[0].images?.url) {
           // For now, we'll assume the first photo was analyzed
           // In a more complete solution, we would store which photo was analyzed
-          setAnalyzedImageUri(data[0].photo_url);
+          setAnalyzedImageUri(data[0].images.url);
         }
       } else {
         console.log('No photos found for this item');
@@ -296,13 +293,13 @@ function ItemDetailScreen({ route, navigation }) {
         console.log('Fetching photos for deletion...');
         const { data: photoData, error: photoError } = await supabase
           .from('item_photos')
-          .select('photo_url')
+          .select('image_id, images(url)')
           .eq('item_id', itemId);
         
         if (photoError) {
           console.error('Error fetching photos for deletion:', photoError);
         } else if (photoData && photoData.length > 0) {
-          photosToDelete = photoData.map(photo => photo.photo_url);
+          photosToDelete = photoData.map(photo => photo.images?.url);
           console.log(`Found ${photosToDelete.length} photos to delete`);
         }
       }

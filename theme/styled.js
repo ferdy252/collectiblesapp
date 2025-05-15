@@ -358,17 +358,25 @@ export const Card = {
       scale.value = withTiming(1, { duration: theme.animations.buttonPress.duration });
     };
     
+    // Use Pressable instead of TouchableOpacity to have more control over gestures
     return (
-      <AnimatedTouchable 
+      <Animated.View 
         style={[theme.cards.interactive, animatedStyle, style]}
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        accessibilityRole="button"
         {...props}
       >
-        {children}
-      </AnimatedTouchable>
+        <Pressable 
+          style={{ flex: 1 }}
+          onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          // Completely disable long press by not providing a handler
+          android_disableSound={true}
+          android_ripple={null}
+          accessibilityRole="button"
+        >
+          {children}
+        </Pressable>
+      </Animated.View>
     );
   },
 };

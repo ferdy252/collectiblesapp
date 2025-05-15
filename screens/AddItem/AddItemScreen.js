@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Text,
   View,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   Image,
   Switch,
@@ -12,7 +12,9 @@ import {
   SafeAreaView,
   Animated,
   Easing,
+  Platform,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -92,9 +94,25 @@ const AddItemScreenContent = ({ navigation, route }) => {
   // Load collections when the component mounts
   useEffect(() => {
     if (currentUser?.id) {
+      console.log('👤 Current user detected in AddItemScreen:', currentUser.id);
       loadCollections();
+    } else {
+      console.log('⚠️ No current user in AddItemScreen useEffect');
     }
   }, [currentUser]);
+  
+  // Force reload collections when the screen is focused
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('🔍 AddItemScreen focused - checking for collections');
+      if (currentUser?.id && (!collections || collections.length === 0)) {
+        console.log('🔄 Reloading collections on screen focus');
+        loadCollections();
+      }
+    });
+    
+    return unsubscribe;
+  }, [navigation, currentUser]);
   
   // Keep analyzedImageUri in sync with the images array
   // This is now handled by the reducer, but we keep this effect for additional safety
@@ -117,11 +135,17 @@ const AddItemScreenContent = ({ navigation, route }) => {
     }
   }, [images, analyzedImageUri]);
   
+  useEffect(() => {
+    console.log('[AddItemScreen] Theme Check: isDarkMode =', isDarkMode, '| backgroundColor =', theme.colors.background);
+  }, [isDarkMode, theme.colors.background]);
+
   // Load collections from the database
   const loadCollections = async () => {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
+    console.log('🔍 Starting to load collections for user:', currentUser?.id);
     try {
       const collectionsData = await fetchCollections(currentUser.id);
+      console.log('📚 Collections data received:', JSON.stringify(collectionsData));
       dispatch({ type: ACTIONS.SET_COLLECTIONS, payload: collectionsData });
       
       // Convert collections to the format needed by DropDownPicker
@@ -129,12 +153,11 @@ const AddItemScreenContent = ({ navigation, route }) => {
         label: collection.name,
         value: collection.id,
       }));
+      console.log('🔄 Collection items set in dropdown:', JSON.stringify(items));
       dispatch({ type: ACTIONS.SET_COLLECTION_ITEMS, payload: items });
       
-      // If there's only one collection, select it automatically
-      if (items.length === 1) {
-        dispatch({ type: ACTIONS.SET_COLLECTION, payload: items[0].value });
-      }
+      // We no longer auto-select the only collection since it's optional
+      console.log('ℹ️ Collections loaded but not auto-selected (optional field)');
     } catch (error) {
       handleError(error, 'Error loading collections', {
         source: 'AddItemScreen.loadCollections',
@@ -222,9 +245,12 @@ const AddItemScreenContent = ({ navigation, route }) => {
         
         console.log(`Processing ${uniqueImages.size} unique images`);
         
-        // Process each unique image only once
-        for (const imageUri of uniqueImages) {
-          console.log('--- Processing unique image URI:', imageUri);
+        // Process all unique images in parallel
+        console.log('Starting parallel image uploads');
+        
+        // Create an array of upload promises
+        const uploadPromises = Array.from(uniqueImages).map(async (imageUri) => {
+          console.log('--- Processing image URI:', imageUri);
           
           try {
             // Try to upload the image with better error handling
@@ -232,20 +258,31 @@ const AddItemScreenContent = ({ navigation, route }) => {
             const uploadedUrl = await uploadImage(imageUri, analyzedImageUri);
             if (uploadedUrl) {
               console.log('Image uploaded successfully:', uploadedUrl);
-              photoUrls.push(uploadedUrl);
+              return uploadedUrl; // Return the URL for successful uploads
             } else {
               console.error('Failed to upload image (null URL returned):', imageUri);
-              // Show a toast for failed uploads
-              Toast.show({
-                type: 'error',
-                text1: 'Upload Failed',
-                text2: 'One or more images failed to upload',
-                position: 'bottom',
-              });
+              return null; // Return null for failed uploads
             }
           } catch (uploadError) {
             console.error('Error uploading image:', imageUri, uploadError);
+            return null; // Return null for errors
           }
+        });
+        
+        // Wait for all uploads to complete
+        const results = await Promise.all(uploadPromises);
+        
+        // Filter out null results (failed uploads)
+        photoUrls.push(...results.filter(url => url !== null));
+        
+        // Show a toast if some uploads failed
+        if (results.some(url => url === null)) {
+          Toast.show({
+            type: 'error',
+            text1: 'Upload Warning',
+            text2: 'One or more images failed to upload',
+            position: 'bottom',
+          });
         }
         
         console.log(`=== UPLOAD COMPLETE: ${photoUrls.length}/${validImages.length} images uploaded successfully ===`);
@@ -282,10 +319,38 @@ const AddItemScreenContent = ({ navigation, route }) => {
     }
   };
   
-  // Handle AI analysis completion - now we just pass the dispatch function
+  // Handle AI analysis completion - create a callback that doesn't need dispatch
   const onAnalysisComplete = (analysisResult, imageUri) => {
-    // Pass the dispatch function directly to handleAnalysisComplete
-    handleAnalysisComplete(analysisResult, imageUri, dispatch, images, CATEGORIES);
+    // When the callback is called, we'll handle the analysis here
+    // without passing dispatch through navigation
+    if (analysisResult && imageUri) {
+      // Store the analysis result
+      dispatch({ type: ACTIONS.SET_AI_ANALYSIS_RESULT, payload: analysisResult });
+      
+      // Update the analyzedImageUri state with the normalized URI
+      dispatch({ type: ACTIONS.SET_ANALYZED_IMAGE_URI, payload: imageUri });
+      
+      // Add image to the array if it doesn't exist already
+      const normalizedUri = imageUri;
+      const imageExists = images.some(uri => areImageUrisEqual(uri, normalizedUri));
+      
+      if (!imageExists) {
+        dispatch({ type: ACTIONS.ADD_IMAGE, payload: normalizedUri });
+      }
+      
+      // Auto-fill form fields with AI analysis results
+      if (analysisResult.name) {
+        dispatch({ type: ACTIONS.SET_ITEM_NAME, payload: analysisResult.name });
+      }
+      
+      if (analysisResult.category && CATEGORIES.includes(analysisResult.category)) {
+        dispatch({ type: ACTIONS.SET_CATEGORY, payload: analysisResult.category });
+      }
+      
+      if (analysisResult.brand) {
+        dispatch({ type: ACTIONS.SET_BRAND, payload: analysisResult.brand });
+      }
+    }
   };
   
   // Animate the save button when pressed
@@ -307,13 +372,13 @@ const AddItemScreenContent = ({ navigation, route }) => {
   };
   
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={theme.colors.background}
       />
       
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -322,15 +387,15 @@ const AddItemScreenContent = ({ navigation, route }) => {
           >
             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
-          <Typography.H2 style={styles.headerTitle}>Add New Item</Typography.H2>
+          <Typography.H2 style={[styles.headerTitle, { color: '#FFFFFF', fontWeight: '700' }]}>Add New Item</Typography.H2>
           <View style={{ width: 40 }} />
         </View>
         
-        {/* Main content */}
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
+        {/* Main content - Using FlatList instead of ScrollView to avoid VirtualizedList nesting error */}
+        <FlatList
+          data={[{key: 'content'}]} 
+          renderItem={() => (
+            <View style={styles.scrollContent}>
           {/* Error display */}
           {hasError && (
             <ErrorDisplay
@@ -341,6 +406,124 @@ const AddItemScreenContent = ({ navigation, route }) => {
             />
           )}
           
+          {/* Images section - Moved to top for better visibility */}
+          <View style={styles.formSection}>
+            <Typography.H3 style={styles.sectionTitle}>Images</Typography.H3>
+            
+            {/* Images display */}
+            <View style={styles.imagesContainer}>
+              {images.map((uri, index) => (
+                <View key={index} style={styles.imageContainer}>
+                  <Image source={{ uri }} style={styles.image} />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => {
+                      dispatch({ type: ACTIONS.REMOVE_IMAGE, payload: index });
+                    }}
+                  >
+                    <Ionicons name="close" size={16} color={theme.colors.textLight} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              
+              {/* Add image button */}
+              {images.length < MAX_PHOTOS && (
+                <TouchableOpacity
+                  style={styles.addImageButton}
+                  onPress={async () => {
+                    // Request permissions first
+                    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+                    const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                    
+                    if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
+                      Alert.alert(
+                        'Permissions Required',
+                        'Camera and photo library access are needed to add photos.',
+                        [{ text: 'OK' }]
+                      );
+                      return;
+                    }
+                    
+                    // Show options to take photo or choose from gallery
+                    Alert.alert(
+                      'Add Photo',
+                      'Choose an option',
+                      [
+                        {
+                          text: 'Take Photo',
+                          onPress: async () => {
+                            try {
+                              const result = await ImagePicker.launchCameraAsync({
+                                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                                allowsEditing: true,
+                                aspect: [4, 3],
+                                quality: 0.8,
+                              });
+                              
+                              if (!result.canceled && result.assets && result.assets[0]) {
+                                const uri = result.assets[0].uri;
+                                dispatch({ type: ACTIONS.ADD_IMAGE, payload: uri });
+                              }
+                            } catch (error) {
+                              console.error('Error taking photo:', error);
+                              Toast.show({
+                                type: 'error',
+                                text1: 'Error',
+                                text2: 'Could not take photo. Please try again.'
+                              });
+                            }
+                          }
+                        },
+                        {
+                          text: 'Choose from Gallery',
+                          onPress: async () => {
+                            try {
+                              const result = await ImagePicker.launchImageLibraryAsync({
+                                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                                allowsEditing: true,
+                                aspect: [4, 3],
+                                quality: 0.8,
+                              });
+                              
+                              if (!result.canceled && result.assets && result.assets[0]) {
+                                const uri = result.assets[0].uri;
+                                dispatch({ type: ACTIONS.ADD_IMAGE, payload: uri });
+                              }
+                            } catch (error) {
+                              console.error('Error picking image:', error);
+                              Toast.show({
+                                type: 'error',
+                                text1: 'Error',
+                                text2: 'Could not select image. Please try again.'
+                              });
+                            }
+                          }
+                        },
+                        {
+                          text: 'Cancel',
+                          style: 'cancel'
+                        }
+                      ]
+                    );
+                  }}
+                >
+                  <Ionicons name="add" size={24} color="#FFFFFF" />
+                  <Text style={{color: '#FFFFFF', marginTop: 5, fontWeight: '600'}}>Add Photo</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            {/* AI analysis result display */}
+            {aiAnalysisResult && (
+              <View style={styles.aiResultContainer}>
+                <Typography.Body style={styles.aiResultTitle}>AI Analysis Result:</Typography.Body>
+                <Typography.Caption style={styles.aiResultText}>
+                  {aiAnalysisResult.description || 'No description available'}
+                </Typography.Caption>
+              </View>
+            )}
+          </View>
+
           {/* Item details section */}
           <View style={styles.formSection}>
             <Typography.H3 style={styles.sectionTitle}>Item Details</Typography.H3>
@@ -348,7 +531,7 @@ const AddItemScreenContent = ({ navigation, route }) => {
             {/* Item name input */}
             <View style={styles.inputContainer}>
               <Typography.Body style={styles.inputLabel}>Item Name*</Typography.Body>
-              <Input
+              <Input.Primary
                 placeholder="Enter item name"
                 value={itemName}
                 onChangeText={(text) => dispatch({ type: ACTIONS.SET_ITEM_NAME, payload: text })}
@@ -357,36 +540,66 @@ const AddItemScreenContent = ({ navigation, route }) => {
             </View>
             
             {/* Category dropdown */}
-            <View style={styles.dropdownContainer}>
+            <View style={[styles.dropdownContainer, { zIndex: 3000 }]}>
               <Typography.Body style={styles.inputLabel}>Category*</Typography.Body>
               <DropDownPicker
                 open={categoryOpen}
                 value={selectedCategory}
                 items={categoryItems}
-                setOpen={(isOpen) => dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'categoryOpen', isOpen } })}
-                setValue={(value) => dispatch({ type: ACTIONS.SET_CATEGORY, payload: value })}
+                setOpen={(isOpen) => {
+                  // Close other dropdowns when opening this one
+                  if (isOpen) {
+                    dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'conditionOpen', isOpen: false } });
+                    dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'collectionOpen', isOpen: false } });
+                  }
+                  dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'categoryOpen', isOpen } });
+                }}
+                setValue={(callback) => {
+                  dispatch({ type: ACTIONS.SET_CATEGORY, payload: callback(selectedCategory) });
+                }}
                 style={styles.dropdown}
                 dropDownContainerStyle={styles.dropdownItemContainer}
                 itemStyle={styles.dropdownItem}
                 placeholder="Select a category"
+                placeholderStyle={{ color: '#AAAAAA' }}
+                textStyle={{ color: theme.colors.text }}
+                arrowIconStyle={{ tintColor: theme.colors.text }}
+                tickIconStyle={{ tintColor: theme.colors.primary }}
+                listItemLabelStyle={{ color: theme.colors.text }}
+                selectedItemLabelStyle={{ color: theme.colors.primary }}
                 zIndex={3000}
                 zIndexInverse={1000}
               />
             </View>
             
             {/* Condition dropdown */}
-            <View style={[styles.dropdownContainer, { zIndex: categoryOpen ? 1000 : 2000 }]}>
+            <View style={[styles.dropdownContainer, { zIndex: 2000 }]}>
               <Typography.Body style={styles.inputLabel}>Condition</Typography.Body>
               <DropDownPicker
                 open={conditionOpen}
                 value={selectedCondition}
                 items={conditionItems}
-                setOpen={(isOpen) => dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'conditionOpen', isOpen } })}
-                setValue={(value) => dispatch({ type: ACTIONS.SET_CONDITION, payload: value })}
+                setOpen={(isOpen) => {
+                  // Close other dropdowns when opening this one
+                  if (isOpen) {
+                    dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'categoryOpen', isOpen: false } });
+                    dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'collectionOpen', isOpen: false } });
+                  }
+                  dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'conditionOpen', isOpen } });
+                }}
+                setValue={(callback) => {
+                  dispatch({ type: ACTIONS.SET_CONDITION, payload: callback(selectedCondition) });
+                }}
                 style={styles.dropdown}
                 dropDownContainerStyle={styles.dropdownItemContainer}
                 itemStyle={styles.dropdownItem}
                 placeholder="Select condition"
+                placeholderStyle={{ color: '#AAAAAA' }}
+                textStyle={{ color: theme.colors.text }}
+                arrowIconStyle={{ tintColor: theme.colors.text }}
+                tickIconStyle={{ tintColor: theme.colors.primary }}
+                listItemLabelStyle={{ color: theme.colors.text }}
+                selectedItemLabelStyle={{ color: theme.colors.primary }}
                 zIndex={2000}
                 zIndexInverse={2000}
               />
@@ -395,7 +608,7 @@ const AddItemScreenContent = ({ navigation, route }) => {
             {/* Brand input */}
             <View style={styles.inputContainer}>
               <Typography.Body style={styles.inputLabel}>Brand/Manufacturer</Typography.Body>
-              <Input
+              <Input.Primary
                 placeholder="Enter brand or manufacturer"
                 value={brand}
                 onChangeText={(text) => dispatch({ type: ACTIONS.SET_BRAND, payload: text })}
@@ -408,7 +621,7 @@ const AddItemScreenContent = ({ navigation, route }) => {
               <Typography.Body style={styles.inputLabel}>Estimated Value</Typography.Body>
               <View style={styles.valueContainer}>
                 <Typography.H3 style={styles.currencySymbol}>$</Typography.H3>
-                <Input
+                <Input.Primary
                   placeholder="0.00"
                   value={value}
                   onChangeText={(text) => dispatch({ type: ACTIONS.SET_VALUE, payload: text })}
@@ -421,11 +634,10 @@ const AddItemScreenContent = ({ navigation, route }) => {
             {/* Notes input */}
             <View style={styles.inputContainer}>
               <Typography.Body style={styles.inputLabel}>Notes</Typography.Body>
-              <Input
+              <Input.TextArea
                 placeholder="Add any notes about this item"
                 value={notes}
                 onChangeText={(text) => dispatch({ type: ACTIONS.SET_NOTES, payload: text })}
-                multiline
                 numberOfLines={4}
                 style={styles.notesInput}
               />
@@ -437,25 +649,84 @@ const AddItemScreenContent = ({ navigation, route }) => {
             <Typography.H3 style={styles.sectionTitle}>Collection</Typography.H3>
             
             {/* Collection dropdown */}
-            <View style={[styles.dropdownContainer, { zIndex: categoryOpen || conditionOpen ? 900 : 1000 }]}>
-              <Typography.Body style={styles.inputLabel}>Collection*</Typography.Body>
+            <View style={[styles.dropdownContainer, { zIndex: 1000 }]}>
+              <Typography.Body style={styles.inputLabel}>Collection (Optional)</Typography.Body>
+              
+              {/* Debug info - remove this in production */}
+              {__DEV__ && (
+                <View style={{ marginBottom: 5 }}>
+                  <Typography.Caption style={{ color: '#888' }}>
+                    Collections: {collections?.length || 0} | Items: {collectionItems?.length || 0}
+                  </Typography.Caption>
+                </View>
+              )}
+              
               <DropDownPicker
                 open={collectionOpen}
                 value={selectedCollectionId}
-                items={collectionItems}
-                setOpen={(isOpen) => dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'collectionOpen', isOpen } })}
-                setValue={(value) => dispatch({ type: ACTIONS.SET_COLLECTION, payload: value })}
+                items={[
+                  { label: 'None', value: null },
+                  ...collectionItems
+                ]}
+                setOpen={(isOpen) => {
+                  // Close other dropdowns when opening this one
+                  if (isOpen) {
+                    dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'categoryOpen', isOpen: false } });
+                    dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'conditionOpen', isOpen: false } });
+                    
+                    // If we're opening the dropdown and there are no collections, try loading them again
+                    if ((!collections || collections.length === 0) && currentUser?.id) {
+                      console.log('🔄 Reloading collections on dropdown open');
+                      loadCollections();
+                    }
+                  }
+                  dispatch({ type: ACTIONS.SET_DROPDOWN_OPEN, payload: { dropdown: 'collectionOpen', isOpen } });
+                }}
+                setValue={(callback) => {
+                  dispatch({ type: ACTIONS.SET_COLLECTION, payload: callback(selectedCollectionId) });
+                }}
                 style={styles.dropdown}
                 dropDownContainerStyle={styles.dropdownItemContainer}
                 itemStyle={styles.dropdownItem}
                 placeholder="Select a collection"
+                placeholderStyle={{ color: '#AAAAAA' }}
+                textStyle={{ color: theme.colors.text }}
+                arrowIconStyle={{ tintColor: theme.colors.text }}
+                schema={{
+                  label: 'label',
+                  value: 'value'
+                }}
+                listMode="SCROLLVIEW"
+                scrollViewProps={{
+                  nestedScrollEnabled: true,
+                }}
+                closeAfterSelecting={true}
+                tickIconStyle={{ tintColor: theme.colors.primary }}
+                listItemLabelStyle={{ color: theme.colors.text }}
+                selectedItemLabelStyle={{ color: theme.colors.primary }}
                 zIndex={1000}
                 zIndexInverse={3000}
                 loading={loading}
                 ListEmptyComponent={() => (
                   <View style={{ padding: 10, alignItems: 'center' }}>
                     <Typography.Body>No collections found</Typography.Body>
-                    <Typography.Body>Create a collection first</Typography.Body>
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Try reloading collections
+                        if (currentUser?.id) {
+                          console.log('🔄 Manual reload of collections');
+                          loadCollections();
+                        }
+                      }}
+                      style={{ marginTop: 5, padding: 5 }}
+                    >
+                      <Typography.Body style={{ color: theme.colors.primary }}>
+                        Tap to refresh
+                      </Typography.Body>
+                    </TouchableOpacity>
+                    <Typography.Body style={{ marginTop: 5 }}>
+                      Or create a collection first
+                    </Typography.Body>
                   </View>
                 )}
               />
@@ -472,77 +743,31 @@ const AddItemScreenContent = ({ navigation, route }) => {
               <Switch
                 value={isShared}
                 onValueChange={(value) => dispatch({ type: ACTIONS.SET_IS_SHARED, payload: value })}
-                trackColor={{ false: '#767577', true: theme.colors.primary + '80' }}
-                thumbColor={isShared ? theme.colors.primary : '#f4f3f4'}
+                trackColor={{ false: theme.colors.divider, true: theme.colors.primary + '80' }}
+                thumbColor={isShared ? theme.colors.primary : theme.colors.surface}
               />
             </View>
           </View>
           
-          {/* Images section */}
-          <View style={styles.formSection}>
-            <Typography.H3 style={styles.sectionTitle}>Images</Typography.H3>
-            
-            {/* Images display */}
-            <View style={styles.imagesContainer}>
-              {images.map((uri, index) => (
-                <View key={index} style={styles.imageContainer}>
-                  <Image source={{ uri }} style={styles.image} />
-                  <TouchableOpacity
-                    style={styles.removeImageButton}
-                    onPress={() => {
-                      dispatch({ type: ACTIONS.REMOVE_IMAGE, payload: index });
-                    }}
-                  >
-                    <Ionicons name="close" size={16} color="white" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              
-              {/* Add image button */}
-              {images.length < MAX_PHOTOS && (
-                <TouchableOpacity
-                  style={styles.addImageButton}
-                  onPress={() => {
-                    // Open the UnifiedImagePicker as a modal or navigate to it
-                    navigation.navigate('ImagePicker', {
-                      onImageSelected: (uri) => {
-                        if (uri) {
-                          dispatch({ type: ACTIONS.ADD_IMAGE, payload: uri });
-                        }
-                      },
-                      onAnalysisComplete: onAnalysisComplete,
-                      // Pass dispatch function to allow direct state updates
-                      dispatch: dispatch
-                    });
-                  }}
-                >
-                  <Ionicons name="add" size={24} color={theme.colors.text} />
-                </TouchableOpacity>
-              )}
-            </View>
-            
-            {/* AI analysis result display */}
-            {aiAnalysisResult && (
-              <View style={styles.aiResultContainer}>
-                <Typography.Body style={styles.aiResultTitle}>AI Analysis Result:</Typography.Body>
-                <Typography.Caption style={styles.aiResultText}>
-                  {aiAnalysisResult.description || 'No description available'}
-                </Typography.Caption>
-              </View>
-            )}
-          </View>
+          {/* Images section moved to top */}
           
-          {/* Save button */}
+          {/* Save button - Made more prominent */}
           <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-            <Button
-              title="Save Item"
+            <Button.Primary
+              title={saving ? "Saving..." : "SAVE ITEM"}
               onPress={handleSave}
-              style={styles.saveButton}
-              loading={saving}
-              icon={<Ionicons name="save-outline" size={20} color="white" style={styles.buttonIcon} />}
+              style={[styles.saveButton, { marginTop: 30, marginBottom: 80, height: 50 }]}
+              disabled={saving}
+              // The 'icon' prop below is passed but won't be rendered by the current Button.Primary component.
+              // This can be addressed by modifying Button.Primary in styled.js later.
+              icon={<Ionicons name="save-outline" size={20} color={theme.colors.textLight} style={styles.buttonIcon} />}
             />
           </Animated.View>
-        </ScrollView>
+            </View>
+          )}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={true}
+        />
       </View>
       
       {/* Loading overlay */}

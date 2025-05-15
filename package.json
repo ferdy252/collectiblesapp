@@ -32,6 +32,7 @@
     "expo": "~52.0.46",
     "expo-barcode-scanner": "^14.0.1",
     "expo-camera": "^16.1.6",
+    "expo-crypto": "^14.1.4",
     "expo-device": "^7.0.3",
     "expo-document-picker": "^13.0.3",
     "expo-file-system": "^18.0.12",

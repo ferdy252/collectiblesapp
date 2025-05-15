@@ -16,7 +16,7 @@ export const styles = createThemedStyles((theme) => ({
     backgroundColor: theme.colors.background,
   },
   scrollContent: {
-    paddingBottom: 30,
+    paddingBottom: 100, // Increased padding to ensure content doesn't get cut off by the bottom nav
   },
   header: {
     flexDirection: 'row',
@@ -35,18 +35,24 @@ export const styles = createThemedStyles((theme) => ({
   },
   sectionTitle: {
     marginBottom: 10,
+    color: '#FFFFFF', // Ensuring white text for better contrast
+    fontWeight: '700', // Making section titles bolder
   },
   inputContainer: {
     marginBottom: 16,
   },
   inputLabel: {
     marginBottom: 8,
+    color: '#FFFFFF', // Ensuring white text for better contrast
+    fontWeight: '600', // Making labels slightly bolder
   },
   input: {
-    backgroundColor: theme.colors.card,
+    backgroundColor: '#000000', // Changed to black
     borderRadius: 8,
     padding: 12,
-    color: theme.colors.text,
+    color: '#FFFFFF', // Changed to white for better contrast
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   dropdownContainer: {
     marginBottom: 16,
@@ -54,13 +60,16 @@ export const styles = createThemedStyles((theme) => ({
   },
   dropdown: {
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.card,
+    backgroundColor: '#000000', // Changed to black
+    borderWidth: 1,
   },
   dropdownItem: {
     justifyContent: 'flex-start',
   },
   dropdownItemContainer: {
-    backgroundColor: theme.colors.card,
+    backgroundColor: '#000000', // Changed to black
+    borderColor: theme.colors.border,
+    borderWidth: 1,
   },
   imagesContainer: {
     flexDirection: 'row',
@@ -84,12 +93,12 @@ export const styles = createThemedStyles((theme) => ({
     height: imageSize,
     margin: 5,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderWidth: 2,
+    borderColor: '#FFFFFF', // Changed to white for better visibility
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.card,
+    backgroundColor: '#000000', // Black background
   },
   removeImageButton: {
     position: 'absolute',
@@ -110,6 +119,7 @@ export const styles = createThemedStyles((theme) => ({
   },
   switchLabel: {
     flex: 1,
+    color: '#FFFFFF', // Ensuring white text for better contrast
   },
   switchDescription: {
     marginTop: 4,
@@ -139,12 +149,14 @@ export const styles = createThemedStyles((theme) => ({
     marginTop: 10,
   },
   notesInput: {
-    backgroundColor: theme.colors.card,
+    backgroundColor: '#000000', // Changed to black
     borderRadius: 8,
     padding: 12,
-    color: theme.colors.text,
+    color: '#FFFFFF', // Changed to white for better contrast
     height: 100,
     textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   valueContainer: {
     flexDirection: 'row',
@@ -152,6 +164,7 @@ export const styles = createThemedStyles((theme) => ({
   },
   currencySymbol: {
     marginRight: 8,
+    color: '#FFFFFF', // Ensuring white text for better contrast
   },
   valueInput: {
     flex: 1,
@@ -159,10 +172,12 @@ export const styles = createThemedStyles((theme) => ({
   aiResultContainer: {
     marginTop: 10,
     padding: 10,
-    backgroundColor: theme.colors.card,
+    backgroundColor: '#000000', // Changed to black
     borderRadius: 8,
     borderLeftWidth: 3,
     borderLeftColor: theme.colors.primary,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   aiResultTitle: {
     marginBottom: 5,

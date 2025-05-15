@@ -55,7 +55,7 @@ export const uploadImage = async (uri, analyzedImageUri) => {
     
     // Upload to Supabase storage
     const { data, error } = await supabase.storage
-      .from('item-images')
+      .from('item-photos')
       .upload(fileName, {
         uri: processedImage.uri,
         type: 'image/jpeg',
@@ -72,12 +72,20 @@ export const uploadImage = async (uri, analyzedImageUri) => {
       return null;
     }
     
-    // Get the public URL
-    const { data: publicUrl } = supabase.storage
-      .from('item-images')
-      .getPublicUrl(fileName);
+    // Get a signed URL that works with private buckets
+    const { data: signedUrl } = await supabase.storage
+      .from('item-photos')
+      .createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year expiry
     
-    return publicUrl.publicUrl;
+    // If we couldn't get a signed URL, fall back to public URL (won't work unless bucket is public)
+    if (!signedUrl || !signedUrl.signedUrl) {
+      const { data: publicUrl } = supabase.storage
+        .from('item-photos')
+        .getPublicUrl(fileName);
+      return publicUrl.publicUrl;
+    }
+    
+    return signedUrl.signedUrl;
     
   } catch (error) {
     // This is the outer catch block that handles errors from the entire function

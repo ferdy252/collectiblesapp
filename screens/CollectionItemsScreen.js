@@ -12,6 +12,7 @@ import {
   Animated,
   Dimensions,
   StatusBar,
+  SafeAreaView,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
@@ -282,52 +283,81 @@ const CollectionItemsScreen = ({ route, navigation }) => {
 
   // Function to render an item card
   const renderItem = ({ item }) => {
+    // Safety check - if item is not valid, render a placeholder
+    if (!item || typeof item !== 'object' || !item.id) {
+      console.error('Invalid item object in renderItem:', item);
+      return null;
+    }
+    
     // Get the first photo URL or use a placeholder
     const photoUrl = item.photos && item.photos.length > 0
       ? item.photos[0]
       : 'https://via.placeholder.com/150/CCCCCC/888888?text=No+Image';
     
+    // Safe reference function that checks for null values
+    const setSwipeableRef = (ref) => {
+      try {
+        if (ref && item && item.id) {
+          swipeableRefs.current[item.id] = ref;
+        }
+      } catch (error) {
+        console.error('Error setting swipeable ref:', error);
+      }
+    };
+    
+    // Safe function to close other swipeables
+    const safeCloseOthers = () => {
+      try {
+        if (item && item.id) {
+          closeAllSwipeables(item.id);
+        }
+      } catch (error) {
+        console.error('Error closing swipeables:', error);
+      }
+    };
+    
     return (
       <Swipeable
-        ref={ref => {
-          if (ref) swipeableRefs.current[item.id] = ref;
-        }}
+        ref={setSwipeableRef}
         renderRightActions={() => renderRightActions(item)}
-        onSwipeableOpen={() => closeAllSwipeables(item.id)}
+        onSwipeableOpen={safeCloseOthers}
         overshootRight={false}
       >
-        <TouchableOpacity
-          style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}
-          onPress={() => handleItemTap(item)}
-          activeOpacity={0.8}
-        >
-          <Image 
-            source={{ uri: photoUrl }} 
-            style={styles.itemImage}
-            resizeMode="cover"
-          />
-          <View style={styles.itemDetails}>
-            <Text style={[styles.itemName, { color: theme.colors.text }]} numberOfLines={1}>
-              {item.name}
-            </Text>
-            <Text style={[styles.itemCategory, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-              {item.category || 'Uncategorized'}
-            </Text>
-            {item.brand && (
-              <Text style={[styles.itemBrand, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                Brand: {item.brand}
+        <View style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}>
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            onPress={() => handleItemTap(item)}
+            activeOpacity={0.8}
+            delayPressIn={0}
+          >
+            <Image 
+              source={{ uri: photoUrl }} 
+              style={styles.itemImage}
+              resizeMode="cover"
+            />
+            <View style={styles.itemDetails}>
+              <Text style={[styles.itemName, { color: theme.colors.text }]} numberOfLines={1}>
+                {item.name}
               </Text>
-            )}
-          </View>
-          <View style={[styles.menuButton, { backgroundColor: isDarkMode ? 'rgba(30, 30, 30, 0.8)' : 'rgba(255, 255, 255, 0.8)' }]}>
-            <TouchableOpacity
-              onPress={() => deleteItem(item.id, item.name)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
+              <Text style={[styles.itemCategory, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                {item.category || 'Uncategorized'}
+              </Text>
+              {item.brand && (
+                <Text style={[styles.itemBrand, { color: theme.colors.textSecondary }]} numberOfLines={1}>
+                  Brand: {item.brand}
+                </Text>
+              )}
+            </View>
+            <View style={[styles.menuButton, { backgroundColor: isDarkMode ? 'rgba(30, 30, 30, 0.8)' : 'rgba(255, 255, 255, 0.8)' }]}>
+              <TouchableOpacity
+                onPress={() => deleteItem(item.id, item.name)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </View>
       </Swipeable>
     );
   };

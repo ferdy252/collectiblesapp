@@ -37,7 +37,7 @@ const AiFeedbackComponent = ({ itemId, analysisData, analyzedImageUri }) => {
         // Query the item_photos table to find the matching photo
         const { data, error } = await supabase
           .from('item_photos')
-          .select('id, photo_url')
+          .select('id, image_id, images(url)')
           .eq('item_id', itemId)
           .order('created_at', { ascending: false });
         
@@ -48,11 +48,11 @@ const AiFeedbackComponent = ({ itemId, analysisData, analyzedImageUri }) => {
         
         if (data && data.length > 0) {
           // Try to find an exact match first
-          let matchedPhoto = data.find(photo => photo.photo_url === analyzedImageUri);
+          let matchedPhoto = data.find(photo => photo.images?.url === analyzedImageUri);
           
           // If no exact match, try to find a photo URL that contains the filename
           if (!matchedPhoto && filename) {
-            matchedPhoto = data.find(photo => photo.photo_url.includes(filename));
+            matchedPhoto = data.find(photo => photo.images?.url.includes(filename));
           }
           
           // If we found a match, store the photo ID

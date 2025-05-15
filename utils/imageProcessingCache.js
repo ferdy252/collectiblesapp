@@ -1,9 +1,27 @@
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as Crypto from 'expo-crypto';
 import { normalizeImageUri } from './uriUtils';
 
-// Cache to store processed images
+// Cache to store processed images in memory
 const processedImageCache = new Map();
+
+// Create a cache directory for persistent storage
+const CACHE_DIRECTORY = `${FileSystem.cacheDirectory}processed-images/`;
+
+// Ensure the cache directory exists
+const ensureCacheDirectory = async () => {
+  const dirInfo = await FileSystem.getInfoAsync(CACHE_DIRECTORY);
+  if (!dirInfo.exists) {
+    console.log('Creating image cache directory');
+    await FileSystem.makeDirectoryAsync(CACHE_DIRECTORY, { intermediates: true });
+  }
+};
+
+// Initialize the cache directory
+ensureCacheDirectory().catch(error => {
+  console.error('Failed to create cache directory:', error);
+});
 
 /**
  * Process an image once and cache the result
@@ -31,13 +49,41 @@ export const processImage = async (uri, options = {}) => {
     // Generate a cache key based on the URI and options
     const key = cacheKey || `${normalizedUri}_${resize.width}x${resize.height}_${quality}`;
     
-    // Check if this image is already processed and cached
+    // Create a hash of the key for the filename
+    const keyHash = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      key
+    );
+    
+    // Define the cache file path
+    const cacheFilePath = `${CACHE_DIRECTORY}${keyHash}.jpg`;
+    
+    // Check if this image is already in memory cache
     if (processedImageCache.has(key)) {
-      console.log('Using cached processed image for:', normalizedUri);
+      console.log('Using memory-cached processed image for:', normalizedUri);
       return processedImageCache.get(key);
     }
     
+    // Check if the image is cached on disk
+    const cacheFileInfo = await FileSystem.getInfoAsync(cacheFilePath);
+    if (cacheFileInfo.exists) {
+      console.log('Using disk-cached processed image for:', normalizedUri);
+      const cachedImage = {
+        uri: cacheFilePath,
+        width: resize.width,
+        height: resize.height
+      };
+      
+      // Also cache in memory for faster access next time
+      processedImageCache.set(key, cachedImage);
+      
+      return cachedImage;
+    }
+    
     console.log('Processing image:', normalizedUri);
+    
+    // Ensure the cache directory exists
+    await ensureCacheDirectory();
     
     // Process the image
     const processedImage = await ImageManipulator.manipulateAsync(
@@ -46,10 +92,22 @@ export const processImage = async (uri, options = {}) => {
       { compress: quality, format }
     );
     
-    // Cache the processed image
-    processedImageCache.set(key, processedImage);
+    // Save to disk cache
+    await FileSystem.copyAsync({
+      from: processedImage.uri,
+      to: cacheFilePath
+    });
     
-    return processedImage;
+    // Update the URI to point to our cached file
+    const cachedImage = {
+      ...processedImage,
+      uri: cacheFilePath
+    };
+    
+    // Cache the processed image in memory
+    processedImageCache.set(key, cachedImage);
+    
+    return cachedImage;
   } catch (error) {
     console.error('Error processing image:', error);
     throw error;
@@ -66,10 +124,31 @@ export const imageToBase64 = async (uri) => {
     const normalizedUri = normalizeImageUri(uri);
     const cacheKey = `base64_${normalizedUri}`;
     
-    // Check if we already have this base64 conversion cached
+    // Create a hash of the key for the filename
+    const keyHash = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      cacheKey
+    );
+    
+    // Define the cache file path
+    const cacheFilePath = `${CACHE_DIRECTORY}${keyHash}.txt`;
+    
+    // Check if we already have this base64 conversion cached in memory
     if (processedImageCache.has(cacheKey)) {
-      console.log('Using cached base64 image for:', normalizedUri);
+      console.log('Using memory-cached base64 image for:', normalizedUri);
       return processedImageCache.get(cacheKey);
+    }
+    
+    // Check if the base64 is cached on disk
+    const cacheFileInfo = await FileSystem.getInfoAsync(cacheFilePath);
+    if (cacheFileInfo.exists) {
+      console.log('Using disk-cached base64 image for:', normalizedUri);
+      const base64 = await FileSystem.readAsStringAsync(cacheFilePath);
+      
+      // Also cache in memory for faster access next time
+      processedImageCache.set(cacheKey, base64);
+      
+      return base64;
     }
     
     console.log('Converting image to base64:', normalizedUri);
@@ -113,7 +192,13 @@ export const imageToBase64 = async (uri) => {
       reader.readAsDataURL(blob);
     });
     
-    // Cache the base64 string
+    // Ensure the cache directory exists
+    await ensureCacheDirectory();
+    
+    // Save to disk cache
+    await FileSystem.writeAsStringAsync(cacheFilePath, base64);
+    
+    // Cache the base64 string in memory
     processedImageCache.set(cacheKey, base64);
     
     return base64;
@@ -125,8 +210,24 @@ export const imageToBase64 = async (uri) => {
 
 /**
  * Clear the image processing cache
+ * @param {boolean} clearDisk - Whether to also clear the disk cache
  */
-export const clearImageCache = () => {
+export const clearImageCache = async (clearDisk = false) => {
+  // Clear memory cache
   processedImageCache.clear();
-  console.log('Image processing cache cleared');
+  console.log('Memory image cache cleared');
+  
+  // Optionally clear disk cache
+  if (clearDisk) {
+    try {
+      const dirInfo = await FileSystem.getInfoAsync(CACHE_DIRECTORY);
+      if (dirInfo.exists) {
+        await FileSystem.deleteAsync(CACHE_DIRECTORY, { idempotent: true });
+        await ensureCacheDirectory();
+        console.log('Disk image cache cleared');
+      }
+    } catch (error) {
+      console.error('Error clearing disk cache:', error);
+    }
+  }
 };

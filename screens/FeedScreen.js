@@ -79,7 +79,6 @@ function FeedScreen({ navigation }) {
           name,
           category,
           brand,
-          photos,
           created_at,
           user_id,
           collection_id
@@ -93,8 +92,33 @@ function FeedScreen({ navigation }) {
       
       console.log(`Fetched ${sharedItems.length} shared items`);
       
+      // Fetch photos for each item
+      const itemsWithPhotos = await Promise.all(sharedItems.map(async (item) => {
+        // Get photos from item_photos and images tables
+        const { data: photoData, error: photoError } = await supabase
+          .from('item_photos')
+          .select(`
+            image_id,
+            images:image_id(url)
+          `)
+          .eq('item_id', item.id);
+        
+        if (photoError) {
+          console.error(`Error fetching photos for item ${item.id}:`, photoError);
+          return { ...item, photos: [] };
+        }
+        
+        // Extract photo URLs from the joined data
+        const photos = photoData.map(photo => photo.images?.url || null).filter(Boolean);
+        
+        return {
+          ...item,
+          photos: photos
+        };
+      }));
+      
       // Fetch like counts, comment counts, and user info for each item
-      const postsWithDetails = await Promise.all(sharedItems.map(async (item) => {
+      const postsWithDetails = await Promise.all(itemsWithPhotos.map(async (item) => {
         // Get like count
         const { count: likeCount, error: likeCountError } = await supabase
           .from('likes')

@@ -293,6 +293,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     session,
     user,
+    currentUser: user, // Add currentUser as an alias for user
     loading,
     notificationsEnabled,
     mfaEnabled,

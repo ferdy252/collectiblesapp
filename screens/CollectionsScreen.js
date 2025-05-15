@@ -133,6 +133,72 @@ function CollectionsScreen({ navigation }) {
       collectionIcon: collection.icon || '📦'
     });
   };
+  
+  // Function to handle long press on a collection (for deletion)
+  const handleCollectionLongPress = (collection) => {
+    if (!collection || typeof collection !== 'object') {
+      return;
+    }
+    
+    Alert.alert(
+      'Delete Collection',
+      `Are you sure you want to delete the collection '${collection.name}'? This will NOT delete the items in the collection.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteCollection(collection.id, collection.name)
+        }
+      ]
+    );
+  };
+  
+  // Function to delete a collection
+  const deleteCollection = async (collectionId, collectionName) => {
+    if (!collectionId) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Cannot delete this collection. Please try again.',
+      });
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      // Delete the collection from the database
+      const { error } = await supabase
+        .from('collections')
+        .delete()
+        .eq('id', collectionId);
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Update the UI by removing the deleted collection
+      setCollections(collections.filter(c => c.id !== collectionId));
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: `'${collectionName}' has been deleted.`,
+      });
+    } catch (error) {
+      console.error('Error deleting collection:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to delete collection. Please try again.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Function to create a new collection
   const handleCreateCollection = async () => {
@@ -222,7 +288,16 @@ function CollectionsScreen({ navigation }) {
     >
       <Text style={styles.cardIcon}>{item.icon}</Text>
       <Typography.Label style={[styles.cardName, { color: isDarkMode ? '#FFFFFF' : theme.colors.text }]} numberOfLines={2}>{item.name}</Typography.Label>
-      <Typography.BodySmall style={[styles.cardCount, { color: isDarkMode ? '#E0E0E0' : theme.colors.textSecondary }]}>{item.itemCount} items</Typography.BodySmall>
+      <View style={styles.cardFooter}>
+        <Typography.BodySmall style={[styles.cardCount, { color: isDarkMode ? '#E0E0E0' : theme.colors.textSecondary }]}>{item.itemCount} items</Typography.BodySmall>
+        <TouchableOpacity 
+          style={styles.deleteButton}
+          onPress={() => handleCollectionLongPress(item)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="trash-outline" size={16} color={theme.colors.error} />
+        </TouchableOpacity>
+      </View>
     </Card.Interactive>
   );
 
@@ -367,6 +442,16 @@ const styles = createThemedStyles((theme) => ({
   safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 5,
+  },
+  deleteButton: {
+    padding: 5,
   },
   header: {
     flexDirection: 'row',

@@ -172,7 +172,10 @@ const UnifiedImagePicker = ({
       console.log('Updated images array:', updatedImages);
       
       // Important: Force a re-render by creating a new array
-      onImagesChange([...updatedImages]);
+      // Only call onImagesChange if it exists
+      if (onImagesChange) {
+        onImagesChange([...updatedImages]);
+      }
       
       // Log the current state of images for debugging
       console.log('Images after update:', updatedImages);
@@ -236,7 +239,10 @@ const UnifiedImagePicker = ({
           // Add the image to the collection using the formatted URI
           console.log('Adding image to collection BEFORE analysis:', formattedUri);
           updatedImages = [...images, formattedUri];
-          onImagesChange(updatedImages);
+          // Only call onImagesChange if it exists
+          if (onImagesChange) {
+            onImagesChange(updatedImages);
+          }
           
           // Double check that the image was added
           console.log('Updated images array after adding:', updatedImages);
@@ -330,7 +336,10 @@ const UnifiedImagePicker = ({
   // Remove an image from the collection
   const removeImage = (uriToRemove) => {
     const updatedImages = images.filter(uri => uri !== uriToRemove);
-    onImagesChange(updatedImages);
+    // Only call onImagesChange if it exists
+    if (onImagesChange) {
+      onImagesChange(updatedImages);
+    }
     
     Toast.show({
       type: 'info',

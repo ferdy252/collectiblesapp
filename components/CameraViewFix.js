@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import { normalizeImageUri } from '../utils/uriUtils';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
@@ -61,8 +62,8 @@ const CameraViewFix = ({ onImageCaptured }) => {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
         
-        // Ensure the URI is properly formatted
-        const formattedUri = formatImageUri(imageUri);
+        // Ensure the URI is properly formatted using the centralized utility
+        const formattedUri = normalizeImageUri(imageUri);
         
         // Log the URI for debugging
         console.log('CameraViewFix - Captured image URI:', formattedUri);
@@ -102,8 +103,8 @@ const CameraViewFix = ({ onImageCaptured }) => {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
         
-        // Ensure the URI is properly formatted
-        const formattedUri = formatImageUri(imageUri);
+        // Ensure the URI is properly formatted using the centralized utility
+        const formattedUri = normalizeImageUri(imageUri);
         
         // Log the URI for debugging
         console.log('CameraViewFix - Selected image URI:', formattedUri);
@@ -121,30 +122,7 @@ const CameraViewFix = ({ onImageCaptured }) => {
     }
   };
 
-  // Helper function to ensure image URIs are properly formatted
-  const formatImageUri = (uri) => {
-    if (!uri) return null;
-    
-    // Log the original URI for debugging
-    console.log('CameraViewFix - Original URI:', uri);
-    
-    // Handle different URI formats consistently across platforms
-    let formattedUri = uri;
-    
-    // First, normalize by removing any existing 'file://' prefix
-    if (formattedUri.startsWith('file://')) {
-      formattedUri = formattedUri.substring(7);
-    }
-    
-    // For iOS: Always ensure the URI starts with 'file://'
-    // For Android: Use the URI without 'file://' prefix
-    if (Platform.OS === 'ios') {
-      formattedUri = `file://${formattedUri}`;
-    }
-    
-    console.log('CameraViewFix - Formatted URI:', formattedUri);
-    return formattedUri;
-  };
+  // We now use the centralized normalizeImageUri function from uriUtils.js
 
   return (
     <View style={styles.container}>
