@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-// Make sure Reanimated is properly set up
-import 'react-native-reanimated';
 import { Text, View, ActivityIndicator, StyleSheet, Platform, StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -57,25 +55,26 @@ const screenOptions = ({ theme }) => ({
   headerShown: false,
   cardStyle: { backgroundColor: theme.colors.background },
   cardStyleInterpolator: ({ current, layouts }) => {
+    const translateX = current.progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [layouts.screen.width, 0],
+    });
+    
+    const opacity = current.progress.interpolate({
+      inputRange: [0, 0.5, 0.9, 1],
+      outputRange: [0, 0.25, 0.7, 1],
+    });
+    
     return {
       cardStyle: {
-        transform: [
-          {
-            translateX: current.progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [layouts.screen.width, 0],
-            }),
-          },
-        ],
-        opacity: current.progress.interpolate({
-          inputRange: [0, 0.5, 0.9, 1],
-          outputRange: [0, 0.25, 0.7, 1],
-        }),
+        transform: [{ translateX }],
+        opacity,
       },
       overlayStyle: {
         opacity: current.progress.interpolate({
           inputRange: [0, 1],
           outputRange: [0, 0.5],
+          extrapolate: 'clamp',
         }),
       },
     };
@@ -359,13 +358,26 @@ const App = () => {
 const AppWithTheme = () => {
   const { theme, isDarkMode } = useTheme();
   
+  // Define the navigation theme based on the app theme
+  const navigationTheme = {
+    dark: isDarkMode,
+    colors: {
+      primary: theme.colors.primary,
+      background: theme.colors.background,
+      card: theme.colors.card,
+      text: theme.colors.text,
+      border: theme.colors.border,
+      notification: theme.colors.notification,
+    },
+  };
+
   return (
     <ErrorBoundary>
       <StatusBar 
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={theme.colors.background}
       />
-      <NavigationContainer>
+      <NavigationContainer theme={navigationTheme}>
         <AppNavigator />
       </NavigationContainer>
       <Toast />
