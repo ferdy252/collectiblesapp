@@ -151,7 +151,7 @@ const SettingsScreen = ({ navigation, route }) => {
       // Fetch all user items from Supabase
       const { data: items, error } = await supabase
         .from('items')
-        .select('id, name, brand, category, collection_id, is_shared, photos, created_at')
+        .select('id, name, brand, category, collection_id, is_shared, notes, condition, value, created_at')
         .eq('user_id', user.id);
 
       if (error) throw error;
@@ -183,8 +183,11 @@ const SettingsScreen = ({ navigation, route }) => {
       await FileSystem.writeAsStringAsync(filePath, csv);
 
       // Upload the file to Supabase Storage
-      const uploadPath = `exports/${user.id}/${fileName}`;
+      // Important: The first folder must be the user's ID to comply with RLS policies
+      const uploadPath = `${user.id}/exports/${fileName}`;
       const fileContents = await FileSystem.readAsStringAsync(filePath);
+      
+      console.log(`Uploading file to ${uploadPath}`);
       
       const { data: uploadData, error: uploadError } = await supabase
         .storage
@@ -197,6 +200,7 @@ const SettingsScreen = ({ navigation, route }) => {
       if (uploadError) throw uploadError;
 
       // Get a signed URL for the file (secure, requires authentication)
+      console.log('Getting signed URL for path:', uploadPath);
       const { data: signedUrlData, error: signedUrlError } = await supabase
         .storage
         .from('user-data')

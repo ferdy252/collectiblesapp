@@ -280,6 +280,23 @@ function CollectionsScreen({ navigation }) {
     navigation.navigate('Search');
   };
 
+  // Render the All Items card at the top
+  const renderAllItemsCard = () => (
+    <Card.Interactive
+      style={[styles.allItemsCard, { backgroundColor: theme.colors.primary }]}
+      onPress={() => navigation.navigate('AllItems')}
+    >
+      <View style={styles.allItemsContent}>
+        <Ionicons name="grid-outline" size={24} color="white" />
+        <View style={styles.allItemsTextContainer}>
+          <Typography.Label style={[styles.allItemsTitle, { color: 'white' }]}>All Items</Typography.Label>
+          <Typography.BodySmall style={[styles.allItemsSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>View all your collectibles</Typography.BodySmall>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="white" />
+      </View>
+    </Card.Interactive>
+  );
+
   // Render a collection card
   const renderCollectionCard = ({ item }) => (
     <Card.Interactive
@@ -318,6 +335,9 @@ function CollectionsScreen({ navigation }) {
       <Ionicons name="albums-outline" size={64} color={isDarkMode ? '#E0E0E0' : theme.colors.textSecondary} />
       <Typography.Body style={[styles.emptyText, { color: isDarkMode ? '#FFFFFF' : theme.colors.textSecondary }]}>
         You don't have any collections yet.
+      </Typography.Body>
+      <Typography.Body style={[styles.emptySubText, { color: isDarkMode ? '#BBBBBB' : theme.colors.textSecondary }]}>
+        You can still view all your items using the All Items option above.
       </Typography.Body>
       <Button.Primary 
         title="Create Your First Collection"
@@ -377,12 +397,27 @@ function CollectionsScreen({ navigation }) {
         onRefresh={handleRefresh}
         ListEmptyComponent={!loading ? renderEmptyListComponent : null}
         style={{ backgroundColor: theme.colors.background }}
-        ListHeaderComponent={loading && collections.length === 0 ? (
-          <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Typography.Body style={[styles.loadingText, { color: isDarkMode ? '#E0E0E0' : theme.colors.textSecondary }]}>Loading collections...</Typography.Body>
-          </View>
-        ) : null}
+        ListHeaderComponent={
+          <>
+            {/* All Items Card */}
+            <View style={styles.allItemsContainer}>
+              {renderAllItemsCard()}
+            </View>
+            
+            {/* Section Title */}
+            <View style={styles.sectionTitleContainer}>
+              <Typography.H3 style={{ color: isDarkMode ? '#FFFFFF' : theme.colors.text }}>Collections</Typography.H3>
+            </View>
+            
+            {/* Loading Indicator */}
+            {loading && collections.length === 0 && (
+              <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+                <ActivityIndicator size="large" color={theme.colors.primary} />
+                <Typography.Body style={[styles.loadingText, { color: isDarkMode ? '#E0E0E0' : theme.colors.textSecondary }]}>Loading collections...</Typography.Body>
+              </View>
+            )}
+          </>
+        }
       />
 
       {/* Create Collection Modal */}
@@ -461,6 +496,36 @@ const styles = createThemedStyles((theme) => ({
     paddingVertical: theme.spacing.lg,
     backgroundColor: theme.colors.background,
   },
+  allItemsContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  allItemsCard: {
+    width: '100%',
+    borderRadius: 10,
+    marginBottom: 8,
+    backgroundColor: theme.colors.primary,
+  },
+  allItemsContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  allItemsTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  allItemsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+  allItemsSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
   subtitle: {
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.xs,
@@ -508,8 +573,15 @@ const styles = createThemedStyles((theme) => ({
     backgroundColor: theme.colors.background,
   },
   emptyText: {
+    marginTop: 10,
+    marginBottom: 10,
     textAlign: 'center',
-    marginVertical: theme.spacing.lg,
+    color: theme.colors.textSecondary,
+  },
+  emptySubText: {
+    marginBottom: 20,
+    textAlign: 'center',
+    fontSize: 14,
     color: theme.colors.textSecondary,
   },
   emptyButton: {

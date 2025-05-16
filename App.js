@@ -27,6 +27,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import AuthScreen from './screens/AuthScreen';
 import CollectionItemsScreen from './screens/CollectionItemsScreen';
+import AllItemsScreen from './screens/AllItemsScreen';
 import EditItemScreen from './screens/EditItemScreen';
 import SelectExistingItemScreen from './screens/SelectExistingItemScreen';
 import EditAccountScreen from './screens/EditAccountScreen';
@@ -104,6 +105,7 @@ function CollectionsStack() {
   return (
     <Stack.Navigator screenOptions={screenOptions({ theme })}>
       <Stack.Screen name="CollectionsMain" component={CollectionsScreen} />
+      <Stack.Screen name="AllItems" component={AllItemsScreen} />
       <Stack.Screen name="CollectionItems" component={CollectionItemsScreen} />
       <Stack.Screen name="SelectExistingItem" component={SelectExistingItemScreen} />
       <Stack.Screen name="ItemDetail" component={ItemDetailScreen} />
@@ -145,6 +147,7 @@ function ProfileStack() {
   return (
     <Stack.Navigator screenOptions={screenOptions({ theme })}>
       <Stack.Screen name="ProfileMain" component={ProfileScreen} />
+      <Stack.Screen name="ItemDetail" component={ItemDetailScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="Statistics" component={StatisticsScreen} />
       <Stack.Screen name="EditAccount" component={EditAccountScreen} />
@@ -179,7 +182,7 @@ function MainAppTabs() {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Collections') {
+          } else if (route.name === 'My Items') {
             iconName = focused ? 'albums' : 'albums-outline';
           } else if (route.name === 'Add') {
             iconName = focused ? 'add-circle' : 'add-circle-outline';
@@ -210,7 +213,7 @@ function MainAppTabs() {
       })}
     >
       <Tab.Screen name="Home" component={HomeStack} />
-      <Tab.Screen name="Collections" component={CollectionsStack} />
+      <Tab.Screen name="My Items" component={CollectionsStack} />
       <Tab.Screen 
         name="Add" 
         component={AddStack} 

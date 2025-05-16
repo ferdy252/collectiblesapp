@@ -27,7 +27,13 @@ import ErrorDisplay from '../components/ErrorDisplay';
 const { width } = Dimensions.get('window');
 // Calculate grid item size based on screen width (3 columns with margins)
 const numColumns = width > 768 ? 4 : 3; // 4 columns on tablets, 3 on phones
-const itemSize = (width - (numColumns + 1) * 10) / numColumns;
+const ITEM_MARGIN = 10; // Margin around each item
+const ITEM_PADDING = 1; // Padding inside the item container
+const ITEM_BORDER_WIDTH = 1; // Border width of the item container
+
+const itemSize = Math.floor((width - (numColumns + 1) * ITEM_MARGIN) / numColumns);
+// Calculate the actual display size for the image within the item container
+const imageDisplaySize = Math.floor(itemSize - 2 * (ITEM_PADDING + ITEM_BORDER_WIDTH));
 
 // Simple Shimmer placeholder component (no animation for now)
 const Shimmer = ({ width, height, style }) => {
@@ -153,17 +159,49 @@ const ProfileScreen = ({ navigation }) => {
   // Fetch user's shared posts
   const fetchUserPosts = async (userId) => {
     try {
-      const { data, error } = await supabase
+      // First get the shared items
+      const { data: items, error } = await supabase
         .from('items')
-        .select('*')
+        .select('id, name, category, created_at')
         .eq('user_id', userId)
         .eq('is_shared', true)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       
-      console.log(`Fetched ${data.length} shared items`);
-      setPosts(data || []);
+      console.log(`Fetched ${items.length} shared items`);
+      
+      if (items && items.length > 0) {
+        // Now fetch the photos for each item
+        const itemsWithPhotos = await Promise.all(
+          items.map(async (item) => {
+            // Get photos from item_photos table
+            const { data: photoData, error: photoError } = await supabase
+              .from('item_photos')
+              .select('image_id, images(url)')
+              .eq('item_id', item.id)
+              .order('display_order', { ascending: true })
+              .limit(1); // Just get the first photo for the grid
+            
+            if (photoError) {
+              console.error(`Error fetching photos for item ${item.id}:`, photoError);
+              return { ...item, photoUrl: null };
+            }
+            
+            // Extract the photo URL if available
+            const photoUrl = photoData && photoData.length > 0 && photoData[0].images ? 
+              photoData[0].images.url : null;
+              
+            console.log(`Item ${item.id} photo URL: ${photoUrl}`);
+            
+            return { ...item, photoUrl };
+          })
+        );
+        
+        setPosts(itemsWithPhotos);
+      } else {
+        setPosts([]);
+      }
     } catch (error) {
       // Use our error handling utility
       handleError(
@@ -313,10 +351,11 @@ const ProfileScreen = ({ navigation }) => {
       );
     }
     
-    // Get the first photo from the item's photos array
-    const photoUri = item.photos && item.photos.length > 0 
-      ? item.photos[0] 
-      : 'https://via.placeholder.com/300/cccccc/ffffff?text=No+Image';
+    // Get the photo URL from our updated data structure
+    const photoUri = item.photoUrl || 'https://via.placeholder.com/300/cccccc/ffffff?text=No+Image';
+    
+    // Debug the photo URI to ensure it's valid
+    console.log(`Rendering item ${item.id} with photo URI: ${photoUri}`);
     
     return (
       <TouchableOpacity
@@ -324,7 +363,13 @@ const ProfileScreen = ({ navigation }) => {
         onPress={() => handlePostTap(item.id)}
         activeOpacity={0.8}
       >
-        <Image source={{ uri: photoUri }} style={[styles.postImage, { backgroundColor: isDarkMode ? '#222222' : theme.colors.divider }]} />
+        <View style={styles.imageContainer}>
+          <Image 
+            source={{ uri: photoUri }} 
+            style={styles.postImage}
+            resizeMode="cover"
+          />
+        </View>
       </TouchableOpacity>
     );
   };
@@ -522,7 +567,7 @@ const ProfileScreen = ({ navigation }) => {
         data={loading ? generateSkeletonItems() : 
               activeTab === 'posts' ? posts : likedItems}
         renderItem={renderPostItem}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.id ? item.id.toString() : `skeleton-${Math.random()}`}
         numColumns={numColumns}
         contentContainerStyle={posts.length === 0 ? { flex: 1 } : null}
         style={[styles.flatList, { backgroundColor: isDarkMode ? '#000000' : theme.colors.background }]}
@@ -643,15 +688,23 @@ const styles = createThemedStyles((theme) => ({
   postItem: {
     width: itemSize,
     height: itemSize,
-    padding: 1,
+    padding: ITEM_PADDING,
     backgroundColor: theme.colors.background,
-    borderWidth: 1,
+    borderWidth: ITEM_BORDER_WIDTH,
     borderColor: theme.colors.divider,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageContainer: {
+    width: imageDisplaySize,
+    height: imageDisplaySize,
+    overflow: 'hidden',
+    borderRadius: 4,
   },
   postImage: {
     width: '100%',
     height: '100%',
-    backgroundColor: theme.colors.divider,
+    borderRadius: 4,
   },
   emptyStateContainer: {
     flex: 1,
