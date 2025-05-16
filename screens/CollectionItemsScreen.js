@@ -164,19 +164,54 @@ const CollectionItemsScreen = ({ route, navigation }) => {
               setDeletingItemId(itemId);
               console.log(`Deleting item with ID: ${itemId}`);
               
-              // First, get the item details to retrieve the image URLs
-              const { data: itemData, error: fetchError } = await supabase
-                .from('items')
-                .select('photos')
-                .eq('id', itemId)
-                .single();
+              // First, get the image IDs associated with this item from the item_photos table
+              const { data: photoData, error: photoFetchError } = await supabase
+                .from('item_photos')
+                .select('image_id')
+                .eq('item_id', itemId);
               
-              if (fetchError) {
-                console.error('Error fetching item details for cleanup:', fetchError);
+              if (photoFetchError) {
+                console.error('Error fetching item photos for cleanup:', photoFetchError);
                 // Continue with deletion even if we can't get the photos
               }
               
-              // Delete the item from the database
+              // If we have associated images, get their URLs from the images table
+              let imageUrls = [];
+              if (photoData && photoData.length > 0) {
+                // Extract the image_ids
+                const imageIds = photoData.map(photo => photo.image_id);
+                
+                // Fetch the image URLs from the images table
+                const { data: imageData, error: imageFetchError } = await supabase
+                  .from('images')
+                  .select('image_url')
+                  .in('id', imageIds);
+                
+                if (imageFetchError) {
+                  console.error('Error fetching image details for cleanup:', imageFetchError);
+                } else if (imageData && imageData.length > 0) {
+                  // Extract the image URLs
+                  imageUrls = imageData.map(img => img.image_url).filter(url => url);
+                }
+              }
+              
+              // Clean up the associated images if we have them
+              if (imageUrls.length > 0) {
+                await deleteImagesFromStorage(imageUrls);
+              }
+              
+              // Delete the item_photos records (the links between items and images)
+              const { error: photoDeleteError } = await supabase
+                .from('item_photos')
+                .delete()
+                .eq('item_id', itemId);
+              
+              if (photoDeleteError) {
+                console.error('Error deleting item_photos records:', photoDeleteError);
+                // Continue with item deletion even if photo link deletion fails
+              }
+              
+              // Finally, delete the item from the database
               const { error } = await supabase
                 .from('items')
                 .delete()
@@ -184,11 +219,6 @@ const CollectionItemsScreen = ({ route, navigation }) => {
               
               if (error) {
                 throw error;
-              }
-              
-              // Clean up the associated images if we have them
-              if (itemData && itemData.photos && itemData.photos.length > 0) {
-                await deleteImagesFromStorage(itemData.photos);
               }
               
               // Remove the item from state

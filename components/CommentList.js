@@ -48,7 +48,7 @@ const CommentList = ({ itemId, itemOwnerId }) => {
           text,
           created_at,
           user_id,
-          profiles:user_id (username, avatar_url)
+          profiles!comments_profiles_fkey(username, avatar_url)
         `)
         .eq('item_id', itemId)
         .order('created_at', { ascending: true });
@@ -99,7 +99,7 @@ const CommentList = ({ itemId, itemOwnerId }) => {
           text,
           created_at,
           user_id,
-          profiles:user_id (username, avatar_url)
+          profiles!comments_profiles_fkey(username, avatar_url)
         `)
         .single();
 

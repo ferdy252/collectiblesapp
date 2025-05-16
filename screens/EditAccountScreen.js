@@ -63,25 +63,23 @@ const EditAccountScreen = ({ navigation }) => {
         console.log('User data loaded:', userData.user.email);
         setEmail(userData.user.email || '');
         
-        // Get username and avatar from user metadata
-        const metadata = userData.user.user_metadata || {};
-        setUsername(metadata.full_name || userData.user.email.split('@')[0]);
-        setAvatarUrl(metadata.avatar_url || null);
-        
-        // Get additional profile data from profiles table
+        // Get profile data from profiles table
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('bio')
+          .select('username, bio, avatar_url')
           .eq('id', userData.user.id)
           .single();
         
-        if (profileError && profileError.code !== 'PGRST116') {
-          // PGRST116 is "not found" error, which is fine for new users
+        if (profileError) {
           console.error('Error fetching profile:', profileError);
-        }
-        
-        if (profileData) {
+          // If no profile exists, we'll use defaults
+          setUsername(userData.user.email.split('@')[0]);
+        } else if (profileData) {
+          // Set state with profile data
+          setUsername(profileData.username || userData.user.email.split('@')[0]);
           setBio(profileData.bio || '');
+          setAvatarUrl(profileData.avatar_url || null);
+          console.log('Profile data loaded:', profileData);
         }
       }
     } catch (error) {
@@ -124,11 +122,14 @@ const EditAccountScreen = ({ navigation }) => {
   // Function to upload avatar image
   const uploadAvatar = async (uri) => {
     try {
-      // Convert image to base64
+      setUploading(true);
+      console.log('Uploading avatar image:', uri);
+      
+      // Convert image to blob
       const response = await fetch(uri);
       const blob = await response.blob();
       const fileExt = uri.split('.').pop();
-      const fileName = `${user.id}-avatar.${fileExt}`;
+      const fileName = `${user.id}-avatar-${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
       
       // Upload to Supabase Storage
@@ -143,17 +144,19 @@ const EditAccountScreen = ({ navigation }) => {
         throw error;
       }
       
-      // Get a signed URL (secure, requires authentication)
-      const { data: urlData, error: signedUrlError } = await supabase.storage
-        .from('profiles')
-        .createSignedUrl(filePath, 60 * 60 * 24 * 365); // Valid for 1 year
+      console.log('Avatar uploaded successfully');
       
-      if (signedUrlError || !urlData || !urlData.signedUrl) {
-        console.error('Failed to get signed URL for avatar:', signedUrlError);
-        throw new Error('Failed to get secure URL for avatar');
+      // Get a public URL for the avatar
+      const { data: publicUrlData } = supabase.storage
+        .from('profiles')
+        .getPublicUrl(filePath);
+      
+      if (!publicUrlData || !publicUrlData.publicUrl) {
+        throw new Error('Failed to get public URL for avatar');
       }
       
-      return urlData.signedUrl;
+      console.log('Avatar public URL:', publicUrlData.publicUrl);
+      return publicUrlData.publicUrl;
     } catch (error) {
       console.error('Error uploading avatar:', error);
       Toast.show({
@@ -162,6 +165,8 @@ const EditAccountScreen = ({ navigation }) => {
         text2: 'Failed to upload avatar',
       });
       return null;
+    } finally {
+      setUploading(false);
     }
   };
   
@@ -253,11 +258,11 @@ const EditAccountScreen = ({ navigation }) => {
       }
       
       // Handle avatar upload if there's a new one
-      let newAvatarUrl = avatarUrl;
-      if (newAvatar) {
-        const uploadedUrl = await uploadAvatar(newAvatar);
+      let finalAvatarUrl = avatarUrl;
+      if (avatarUrl && !avatarUrl.startsWith('http')) {
+        const uploadedUrl = await uploadAvatar(avatarUrl);
         if (uploadedUrl) {
-          newAvatarUrl = uploadedUrl;
+          finalAvatarUrl = uploadedUrl;
         }
       }
       
@@ -265,13 +270,19 @@ const EditAccountScreen = ({ navigation }) => {
       const sanitizedUsername = sanitizeString(username);
       const sanitizedBio = sanitizeString(bio);
       
+      console.log('Updating profile with:', {
+        username: sanitizedUsername,
+        bio: sanitizedBio,
+        avatar_url: finalAvatarUrl
+      });
+      
       // Update profile in the database
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
           username: sanitizedUsername,
           bio: sanitizedBio,
-          avatar_url: newAvatarUrl,
+          avatar_url: finalAvatarUrl,
           updated_at: new Date().toISOString(),
         })
         .eq('id', user.id);
@@ -322,7 +333,7 @@ const EditAccountScreen = ({ navigation }) => {
           <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Edit Account</Text>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Edit Profile</Text>
           <View style={{ width: 24 }}><Text> </Text></View>
         </View>
         

@@ -356,7 +356,7 @@ const UnifiedImagePicker = ({
           <View style={styles.imageGrid}>
             {images.map((item, index) => (
               <View key={`image-${index}`} style={styles.imageContainer}>
-                <Image source={{ uri: item }} style={styles.imagePreview} />
+                <Image source={{ uri: item }} style={styles.image} />
                 <TouchableOpacity
                   style={styles.removeButton}
                   onPress={() => removeImage(item)}

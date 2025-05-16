@@ -25,6 +25,7 @@ import { useAuth } from '../../context/AuthContext';
 import { handleError } from '../../utils/errorHandler';
 import ErrorDisplay from '../../components/ErrorDisplay';
 import UnifiedImagePicker from '../../components/UnifiedImagePicker';
+import ImageAnalyzer from '../../components/ImageAnalyzer';
 
 // Import the context provider and actions
 import { AddItemProvider, useAddItem } from './AddItemContext';
@@ -138,6 +139,12 @@ const AddItemScreenContent = ({ navigation, route }) => {
   useEffect(() => {
     console.log('[AddItemScreen] Theme Check: isDarkMode =', isDarkMode, '| backgroundColor =', theme.colors.background);
   }, [isDarkMode, theme.colors.background]);
+
+  // Callback for when AI analysis is complete
+  const handleAiAnalysisCompletion = (analysisResult, imageUri) => {
+    // Use the existing utility function to handle the results
+    handleAnalysisComplete(analysisResult, imageUri, dispatch, images, CATEGORIES);
+  };
 
   // Load collections from the database
   const loadCollections = async () => {
@@ -330,8 +337,7 @@ const AddItemScreenContent = ({ navigation, route }) => {
   
   // Handle AI analysis completion - create a callback that doesn't need dispatch
   const onAnalysisComplete = (analysisResult, imageUri) => {
-    // When the callback is called, we'll handle the analysis here
-    // without passing dispatch through navigation
+    // When the callback is called, we'll handle the analysis here using our utility function
     if (analysisResult && imageUri) {
       // Store the analysis result
       dispatch({ type: ACTIONS.SET_AI_ANALYSIS_RESULT, payload: analysisResult });
@@ -339,26 +345,8 @@ const AddItemScreenContent = ({ navigation, route }) => {
       // Update the analyzedImageUri state with the normalized URI
       dispatch({ type: ACTIONS.SET_ANALYZED_IMAGE_URI, payload: imageUri });
       
-      // Add image to the array if it doesn't exist already
-      const normalizedUri = imageUri;
-      const imageExists = images.some(uri => areImageUrisEqual(uri, normalizedUri));
-      
-      if (!imageExists) {
-        dispatch({ type: ACTIONS.ADD_IMAGE, payload: normalizedUri });
-      }
-      
-      // Auto-fill form fields with AI analysis results
-      if (analysisResult.name) {
-        dispatch({ type: ACTIONS.SET_ITEM_NAME, payload: analysisResult.name });
-      }
-      
-      if (analysisResult.category && CATEGORIES.includes(analysisResult.category)) {
-        dispatch({ type: ACTIONS.SET_CATEGORY, payload: analysisResult.category });
-      }
-      
-      if (analysisResult.brand) {
-        dispatch({ type: ACTIONS.SET_BRAND, payload: analysisResult.brand });
-      }
+      // Use the utility function to handle the rest of the processing
+      handleAnalysisComplete(analysisResult, imageUri, dispatch, images, CATEGORIES);
     }
   };
   
@@ -415,123 +403,14 @@ const AddItemScreenContent = ({ navigation, route }) => {
             />
           )}
           
-          {/* Images section - Moved to top for better visibility */}
-          <View style={styles.formSection}>
-            <Typography.H3 style={styles.sectionTitle}>Images</Typography.H3>
-            
-            {/* Images display */}
-            <View style={styles.imagesContainer}>
-              {images.map((uri, index) => (
-                <View key={index} style={styles.imageContainer}>
-                  <Image source={{ uri }} style={styles.image} />
-                  <TouchableOpacity
-                    style={styles.removeImageButton}
-                    onPress={() => {
-                      dispatch({ type: ACTIONS.REMOVE_IMAGE, payload: index });
-                    }}
-                  >
-                    <Ionicons name="close" size={16} color={theme.colors.textLight} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              
-              {/* Add image button */}
-              {images.length < MAX_PHOTOS && (
-                <TouchableOpacity
-                  style={styles.addImageButton}
-                  onPress={async () => {
-                    // Request permissions first
-                    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
-                    const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                    
-                    if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
-                      Alert.alert(
-                        'Permissions Required',
-                        'Camera and photo library access are needed to add photos.',
-                        [{ text: 'OK' }]
-                      );
-                      return;
-                    }
-                    
-                    // Show options to take photo or choose from gallery
-                    Alert.alert(
-                      'Add Photo',
-                      'Choose an option',
-                      [
-                        {
-                          text: 'Take Photo',
-                          onPress: async () => {
-                            try {
-                              const result = await ImagePicker.launchCameraAsync({
-                                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                                allowsEditing: true,
-                                aspect: [4, 3],
-                                quality: 0.8,
-                              });
-                              
-                              if (!result.canceled && result.assets && result.assets[0]) {
-                                const uri = result.assets[0].uri;
-                                dispatch({ type: ACTIONS.ADD_IMAGE, payload: uri });
-                              }
-                            } catch (error) {
-                              console.error('Error taking photo:', error);
-                              Toast.show({
-                                type: 'error',
-                                text1: 'Error',
-                                text2: 'Could not take photo. Please try again.'
-                              });
-                            }
-                          }
-                        },
-                        {
-                          text: 'Choose from Gallery',
-                          onPress: async () => {
-                            try {
-                              const result = await ImagePicker.launchImageLibraryAsync({
-                                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                                allowsEditing: true,
-                                aspect: [4, 3],
-                                quality: 0.8,
-                              });
-                              
-                              if (!result.canceled && result.assets && result.assets[0]) {
-                                const uri = result.assets[0].uri;
-                                dispatch({ type: ACTIONS.ADD_IMAGE, payload: uri });
-                              }
-                            } catch (error) {
-                              console.error('Error picking image:', error);
-                              Toast.show({
-                                type: 'error',
-                                text1: 'Error',
-                                text2: 'Could not select image. Please try again.'
-                              });
-                            }
-                          }
-                        },
-                        {
-                          text: 'Cancel',
-                          style: 'cancel'
-                        }
-                      ]
-                    );
-                  }}
-                >
-                  <Ionicons name="add" size={24} color="#FFFFFF" />
-                  <Text style={{color: '#FFFFFF', marginTop: 5, fontWeight: '600'}}>Add Photo</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            
-            {/* AI analysis result display */}
-            {aiAnalysisResult && (
-              <View style={styles.aiResultContainer}>
-                <Typography.Body style={styles.aiResultTitle}>AI Analysis Result:</Typography.Body>
-                <Typography.Caption style={styles.aiResultText}>
-                  {aiAnalysisResult.description || 'No description available'}
-                </Typography.Caption>
-              </View>
-            )}
-          </View>
+          {/* Unified Image Picker with AI Analysis */}
+          <Typography.Label style={{ marginBottom: 8, color: theme.colors.text }}>Photos (Max {MAX_PHOTOS})</Typography.Label>
+          <UnifiedImagePicker
+            images={images} // This is state.images
+            onImagesChange={(newImages) => dispatch({ type: ACTIONS.SET_IMAGES, payload: newImages })}
+            onAnalysisComplete={handleAiAnalysisCompletion}
+            maxPhotos={MAX_PHOTOS}
+          />
 
           {/* Item details section */}
           <View style={styles.formSection}>
@@ -572,6 +451,11 @@ const AddItemScreenContent = ({ navigation, route }) => {
                 placeholder="Select a category"
                 placeholderStyle={{ color: '#AAAAAA' }}
                 textStyle={{ color: theme.colors.text }}
+                listMode="SCROLLVIEW"
+                scrollViewProps={{
+                  nestedScrollEnabled: true,
+                }}
+                maxHeight={300}
                 arrowIconStyle={{ tintColor: theme.colors.text }}
                 tickIconStyle={{ tintColor: theme.colors.primary }}
                 listItemLabelStyle={{ color: theme.colors.text }}
@@ -758,8 +642,6 @@ const AddItemScreenContent = ({ navigation, route }) => {
             </View>
           </View>
           
-          {/* Images section moved to top */}
-          
           {/* Save button - Made more prominent */}
           <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
             <Button.Primary
@@ -775,7 +657,7 @@ const AddItemScreenContent = ({ navigation, route }) => {
             </View>
           )}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={true}
+          showsVerticalScrollIndicator={false}
         />
       </View>
       

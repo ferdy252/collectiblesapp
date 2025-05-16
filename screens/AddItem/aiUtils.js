@@ -65,19 +65,26 @@ export const handleAnalysisComplete = async (analysisResult, imageUri, dispatch,
   
   // Auto-fill form fields with AI analysis results
   if (analysisResult) {
-    // Fill item name if provided
-    if (analysisResult.name) {
+    // Fill item name if provided and not empty
+    if (analysisResult.name && analysisResult.name.trim() !== '') {
       dispatch({ type: ACTIONS.SET_ITEM_NAME, payload: analysisResult.name });
     }
     
     // Fill category if provided and valid
-    if (analysisResult.category && CATEGORIES.includes(analysisResult.category)) {
+    if (analysisResult.category && 
+        analysisResult.category.trim() !== '' && 
+        CATEGORIES.includes(analysisResult.category)) {
       dispatch({ type: ACTIONS.SET_CATEGORY, payload: analysisResult.category });
     }
     
-    // Fill brand if provided
-    if (analysisResult.brand) {
+    // Fill brand if provided and not empty
+    if (analysisResult.brand && analysisResult.brand.trim() !== '') {
       dispatch({ type: ACTIONS.SET_BRAND, payload: analysisResult.brand });
+    }
+    
+    // Fill notes with the AI description if available
+    if (analysisResult.description && analysisResult.description.trim() !== '') {
+      dispatch({ type: ACTIONS.SET_NOTES, payload: analysisResult.description });
     }
   }
 };

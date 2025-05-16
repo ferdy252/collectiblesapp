@@ -2,13 +2,16 @@
 
 // Categories for collectible items
 export const CATEGORIES = [
-  'Action Figures',
-  'Cards',
-  'Comics',
-  'Coins',
+  'Action Figures & Toys',
+  'Antiques',
+  'Autographs & Memorabilia',
+  'Books & Comics',
+  'Cards & Trading Cards',
+  'Coins & Currency',
+  'Models & Miniatures',
+  'Music & Records',
   'Stamps',
-  'Vinyl Records',
-  'Vintage Toys',
+  'Video Games',
   'Other'
 ];
 
