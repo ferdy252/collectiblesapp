@@ -29,8 +29,7 @@ import { Typography, Button, Card, Layout, createThemedStyles } from '../theme/s
 import { handleError, ERROR_CATEGORIES } from '../utils/errorHandler';
 import ErrorDisplay from '../components/ErrorDisplay';
 
-// Constants for API key storage
-const GEMINI_API_KEY_STORAGE = 'gemini_api_key';
+// Storage key for AI features preference
 const AI_FEATURES_ENABLED_STORAGE = 'ai_features_enabled';
 
 function ItemDetailScreen({ route, navigation }) {
@@ -52,7 +51,7 @@ function ItemDetailScreen({ route, navigation }) {
   const [conditionData, setConditionData] = useState(null);
   const [analyzingCondition, setAnalyzingCondition] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(false);
-  const [geminiApiKey, setGeminiApiKey] = useState('');
+
 
   // Fetch item data when the screen comes into focus
   useEffect(() => {
@@ -62,16 +61,9 @@ function ItemDetailScreen({ route, navigation }) {
     }
   }, [isFocused]);
 
-  // Load AI settings from secure storage
+  // Load AI features preference from secure storage
   const loadAiSettings = async () => {
     try {
-      // Load API key
-      const savedApiKey = await SecureStore.getItemAsync(GEMINI_API_KEY_STORAGE);
-      if (savedApiKey) {
-        setGeminiApiKey(savedApiKey);
-      }
-      
-      // Load AI features enabled setting
       const aiEnabledSetting = await SecureStore.getItemAsync(AI_FEATURES_ENABLED_STORAGE);
       if (aiEnabledSetting !== null) {
         setAiEnabled(aiEnabledSetting === 'true');
@@ -356,24 +348,6 @@ function ItemDetailScreen({ route, navigation }) {
         return;
       }
       
-      if (!geminiApiKey) {
-        Alert.alert(
-          'API Key Required',
-          'You need to set up a Google Gemini API key to use the AI condition analysis feature.',
-          [
-            {
-              text: 'Cancel',
-              style: 'cancel',
-            },
-            {
-              text: 'Go to Settings',
-              onPress: () => navigation.navigate('ApiSettings'),
-            },
-          ]
-        );
-        return;
-      }
-      
       setAnalyzingCondition(true);
       setHasError(false);
       
@@ -384,8 +358,7 @@ function ItemDetailScreen({ route, navigation }) {
       const analysisResult = await analyzeItemCondition(
         imageUri,
         item.name,
-        item.category,
-        geminiApiKey
+        item.category
       );
       
       setConditionData(analysisResult);

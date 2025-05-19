@@ -16,7 +16,7 @@ export default ({ config: defaultConfig }) => {
       ...appConfig.extra,
       APP_ENV: appEnv,
       // Add Gemini API key from environment variables
-      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+      GEMINI_API_KEY: process.env.EXPO_PUBLIC_GEMINI_API_KEY,
       // Add any other environment variables you need here
     },
     // You can override any app.json settings here based on environment

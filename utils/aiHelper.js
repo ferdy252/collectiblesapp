@@ -23,13 +23,19 @@ export const analyzeImageWithAI = async (imageUri) => {
     // Add any additional parameters your API might need
     formData.append('feature', 'BARCODE_DETECTION');
     
-    // Replace with your actual Google AI Vision API endpoint
-    const response = await fetch('https://your-google-ai-vision-api-endpoint', {
+    // Get the API endpoint and key from environment variables
+    const apiEndpoint = process.env.EXPO_PUBLIC_VISION_API_ENDPOINT;
+    const apiKey = process.env.EXPO_PUBLIC_VISION_API_KEY;
+
+    if (!apiEndpoint || !apiKey) {
+      throw new Error('Vision API configuration missing. Please set EXPO_PUBLIC_VISION_API_ENDPOINT and EXPO_PUBLIC_VISION_API_KEY in your .env file');
+    }
+
+    const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'multipart/form-data',
-        // Add any API keys or authentication headers needed
-        'Authorization': 'Bearer YOUR_API_KEY', // Replace with your actual API key or use environment variables
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: formData,
     });
