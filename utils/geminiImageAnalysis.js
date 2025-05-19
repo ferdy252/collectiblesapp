@@ -4,17 +4,19 @@ import { imageToBase64 } from './imageProcessingCache';
 
 // Get the Gemini API key from environment variables
 const getGeminiApiKey = () => {
-  // Try to get from Expo Constants first (which can access .env through app.config.js)
-  const expoApiKey = Constants.expoConfig?.extra?.GEMINI_API_KEY;
+  // Try to get from Expo Constants first (if configured via app.config.js extras)
+  const expoConstantsApiKey = Constants.expoConfig?.extra?.GEMINI_API_KEY;
   
-  // Fallback to process.env (for development)
-  const processApiKey = process.env.GEMINI_API_KEY;
+  // Fallback to process.env using the EXPO_PUBLIC_ prefix
+  const processEnvApiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY; 
   
-  const apiKey = expoApiKey || processApiKey;
+  const apiKey = expoConstantsApiKey || processEnvApiKey;
   
   if (!apiKey) {
-    console.error('No Gemini API key found. Please set GEMINI_API_KEY in your .env file');
-    throw new Error('Missing Gemini API key');
+    console.error('Gemini API key not found. Ensure EXPO_PUBLIC_GEMINI_API_KEY is in .env or GEMINI_API_KEY is in app.config.js extras.');
+    // In a real app, you might want to throw an error or return a specific status
+    // For now, we'll log and throw to make it clear during development.
+    throw new Error('Missing Gemini API key. Check environment variables.');
   }
   
   return apiKey;
