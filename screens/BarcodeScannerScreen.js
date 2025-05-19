@@ -16,7 +16,6 @@ import { useAuth } from '../context/AuthContext';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../lib/supabase';
 import { createThemedStyles } from '../theme/styled';
-import { analyzeImageWithAI } from '../utils/aiHelper'; // Assuming this function exists
 
 const BarcodeScannerScreen = ({ navigation, route }) => {
   const { theme, isDarkMode } = useTheme();
@@ -67,34 +66,28 @@ const BarcodeScannerScreen = ({ navigation, route }) => {
     setLoading(true);
     try {
       // Call the AI service to analyze the image and extract the barcode
-      const barcodeData = await analyzeImageWithAI(imageUri);
+      // const barcodeData = await analyzeImageWithAI(imageUri);
       
-      if (barcodeData && barcodeData.upc) {
-        console.log(`Barcode detected: ${barcodeData.upc}`);
+      // if (barcodeData && barcodeData.upc) {
+      //   console.log(`Barcode detected: ${barcodeData.upc}`);
         
-        // Look up the barcode in a product database
-        const productInfo = await lookupBarcode(barcodeData.upc);
+      //   // Look up the barcode in a product database
+      //   const productInfo = await lookupBarcode(barcodeData.upc);
         
-        // Navigate to AddItemScreen with the data
-        navigation.replace('Add', {
-          barcodeData: barcodeData.upc,
-          productInfo: productInfo || null
-        });
-      } else {
-        Toast.show({
-          type: 'error',
-          text1: 'Barcode Not Found',
-          text2: 'Could not detect a barcode in the image. Please try again.',
-        });
-      }
+      //   // Navigate to AddItemScreen with the data
+      //   navigation.replace('Add', {
+      //     barcodeData: barcodeData.upc,
+      //     productInfo: productInfo || null,
+      //     imageUri: imageUri, // Pass the captured image URI
+      //   });
+      // } else {
+      //   Alert.alert('No Barcode Detected', 'Could not find a barcode in the image. Please try again.');
+      // }
+      Alert.alert('Barcode Processing To Be Implemented', 'This feature will be updated to use an on-device scanner.');
+      setLoading(false); // Make sure to stop loading
     } catch (error) {
       console.error('Error processing image:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Processing Error',
-        text2: 'Could not analyze the image. Please try again.',
-      });
-    } finally {
+      Alert.alert('Error', 'An error occurred while processing the image.');
       setLoading(false);
     }
   };
