@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "CollectibleTrackerApp",
+    "slug": "CollectibleTrackerApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.collectibletrackerapp",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "We need access to your camera to scan barcodes of collectible items."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.yourcompany.collectibletrackerapp",
+      "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
+      "permissions": ["CAMERA"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#ffffff"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan barcodes of collectible items."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2b60ed3f-9be6-46d4-97e4-d7cb0e7d2c33"
+      }
+    }
+  }
+}
