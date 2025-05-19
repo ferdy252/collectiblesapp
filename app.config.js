@@ -8,10 +8,17 @@ export default ({ config: defaultConfig }) => {
   
   // Base configuration from app.json
   const appConfig = defaultConfig;
+
+  // Filter out 'expo-barcode-scanner' from existing plugins if present
+  let existingPlugins = appConfig.plugins || [];
+  existingPlugins = existingPlugins.filter(plugin => plugin !== 'expo-barcode-scanner');
   
   // Add environment-specific configuration
   return {
     ...appConfig,
+    // If existingPlugins is now empty, we can omit the plugins key or set it to an empty array.
+    // If there were other plugins, they'd remain.
+    ...(existingPlugins.length > 0 ? { plugins: existingPlugins } : {}),
     extra: {
       ...appConfig.extra,
       APP_ENV: appEnv,

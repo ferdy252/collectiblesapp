@@ -132,12 +132,25 @@ export const itemReducer = (state, action) => {
       return { ...state, saving: action.payload };
       
     case ACTIONS.SET_ERROR:
-      return { 
-        ...state, 
-        hasError: true, 
-        errorMessage: action.payload 
+      let msg = 'An unexpected error occurred.'; // Default message
+      if (typeof action.payload === 'string') {
+        msg = action.payload;
+      } else if (action.payload && typeof action.payload.message === 'string') {
+        msg = action.payload.message;
+      } else if (action.payload) {
+        // Attempt to stringify if it's some other truthy value, though this is less ideal
+        try {
+          msg = String(action.payload);
+        } catch (e) {
+          // Fallback if String() fails for some reason
+        }
+      }
+      return {
+        ...state,
+        hasError: true,
+        errorMessage: msg
       };
-      
+
     case ACTIONS.CLEAR_ERROR:
       return { 
         ...state, 

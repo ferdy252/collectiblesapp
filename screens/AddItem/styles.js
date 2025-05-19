@@ -30,6 +30,45 @@ export const styles = createThemedStyles((theme) => ({
   backButton: {
     padding: 8,
   },
+  // Options screen styles
+  optionsContainer: {
+    flex: 1,
+    padding: 20,
+  },
+  optionsTitle: {
+    textAlign: 'center',
+    marginBottom: 30,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+    backgroundColor: '#1A1A1A',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  optionIcon: {
+    marginRight: 16,
+  },
+  optionTextContainer: {
+    flex: 1,
+  },
+  optionTitle: {
+    marginBottom: 4,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  optionDescription: {
+    opacity: 0.7,
+    color: '#CCCCCC',
+  },
   formSection: {
     marginBottom: 20,
   },
