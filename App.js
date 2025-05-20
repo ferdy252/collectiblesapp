@@ -16,7 +16,9 @@ import ProfileScreen from './screens/ProfileScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import SearchScreen from './screens/SearchScreen';
 import WelcomeScreen from './screens/WelcomeScreen';
-import BarcodeScannerScreen from './screens/BarcodeScannerScreen';
+// Rename imports for clarity as there are two BarcodeScannerScreen files
+import AddItemBarcodeScannerScreen from './screens/AddItem/BarcodeScannerScreen'; // For the Add item flow
+import BarcodeScannerScreen from './screens/AddItem/BarcodeScannerScreen'; // For the Home stack (assuming this is the original one)
 import StatisticsScreen from './screens/StatisticsScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 import ImagePickerScreen from './screens/AddItem/ImagePickerScreen';
@@ -90,7 +92,8 @@ function HomeStack() {
       <Stack.Screen name="ItemDetail" component={ItemDetailScreen} />
       <Stack.Screen name="EditItem" component={EditItemScreen} />
       <Stack.Screen name="Search" component={SearchScreen} />
-      <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
+      {/* Ensure HomeStack uses the new BarcodeScannerScreen */}
+      <Stack.Screen name="BarcodeScannerScreen" component={BarcodeScannerScreen} />
       <Stack.Screen name="Statistics" component={StatisticsScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="ViewProfile" component={ViewProfileScreen} />
@@ -134,7 +137,8 @@ function AddStack() {
   return (
     <Stack.Navigator screenOptions={screenOptions({ theme })}>
       <Stack.Screen name="AddMain" component={AddItemScreen} />
-      <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
+      {/* Ensure AddStack uses the new BarcodeScannerScreen from AddItem folder */}
+      <Stack.Screen name="BarcodeScannerScreen" component={AddItemBarcodeScannerScreen} />
       <Stack.Screen name="ImagePicker" component={ImagePickerScreen} />
     </Stack.Navigator>
   );
@@ -299,15 +303,24 @@ const AppNavigator = () => {
     setupApp();
   }, [user]);
   
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
-  // Check if onboarding has been completed before
+  // Check if we should show onboarding
   useEffect(() => {
     async function checkOnboardingStatus() {
       try {
-        const value = await AsyncStorage.getItem('onboardingCompleted');
-        if (value === 'true') {
+        // We'll show onboarding in two cases:
+        // 1. First time app users (never completed onboarding)
+        // 2. Users who are not signed in (logged out)
+        
+        if (!user) {
+          // User is not signed in, show onboarding
+          console.log('User not signed in, showing onboarding');
+          setShowOnboarding(true);
+        } else {
+          // User is signed in, don't show onboarding
+          console.log('User is signed in, skipping onboarding');
           setShowOnboarding(false);
         }
       } catch (error) {
@@ -318,28 +331,34 @@ const AppNavigator = () => {
     }
 
     checkOnboardingStatus();
-  }, []);
+  }, [user]); // Re-run this check whenever the user state changes
 
   // Handle onboarding completion
-  const handleOnboardingComplete = () => {
-    setShowOnboarding(false);
+  const handleOnboardingComplete = async () => {
+    try {
+      // Mark onboarding as completed
+      await AsyncStorage.setItem('onboardingCompleted', 'true');
+      setShowOnboarding(false);
+    } catch (error) {
+      console.error('Error saving onboarding status:', error);
+    }
   };
 
   if (loading || checkingOnboarding) {
     return <LoadingScreen />;
   }
 
-  // Show onboarding if it hasn't been completed yet
-  if (showOnboarding) {
+  // Show onboarding if not logged in
+  if (!user && showOnboarding) {
     return <WelcomeScreen onComplete={handleOnboardingComplete} />;
   }
 
-  // Show auth screen if not logged in
+  // Show auth screen if not logged in and onboarding is completed/skipped
   if (!user) {
     return <AuthScreen />;
   }
 
-  // Show main app if logged in
+  // Show main app if logged in and onboarding completed
   return <MainAppTabs />;
 }
 

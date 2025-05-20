@@ -66,10 +66,18 @@ function HomeScreen({ navigation }) {
     try {
       console.log('Fetching recent items from Supabase...');
       
-      // Query the 3 most recent items from the items table
+      if (!user || !user.id) {
+        console.log('User not available, skipping fetchRecentItems');
+        setRecentItems([]); // Clear items if no user
+        setLoading(false); // Ensure loading is false if we skip
+        return;
+      }
+
+      // Query the 3 most recent items from the items table for the current user
       const { data, error } = await supabase
         .from('items')
         .select('*') // Select all columns
+        .eq('user_id', user.id) // Filter by user_id
         .order('created_at', { ascending: false }) // Order by created_at in descending order
         .limit(3); // Limit to 3 items
       
@@ -103,10 +111,18 @@ function HomeScreen({ navigation }) {
     try {
       console.log('Fetching notifications from Supabase...');
       
-      // Query notifications from the notifications table
+      if (!user || !user.id) {
+        console.log('User not available, skipping fetchNotifications');
+        setNotifications([]); // Clear notifications if no user
+        setUnreadCount(0);
+        return;
+      }
+
+      // Query notifications from the notifications table for the current user
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
+        .eq('user_id', user.id) // Filter by user_id
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -120,7 +136,7 @@ function HomeScreen({ navigation }) {
       }
       
       // If no notifications found, create a welcome notification for new users
-      if (!data || data.length === 0) {
+      if ((!data || data.length === 0) && user) { // Check user here again to be safe
         const defaultNotifications = [
           {
             id: 'welcome-1',
@@ -130,15 +146,16 @@ function HomeScreen({ navigation }) {
             read: false,
             created_at: new Date().toISOString(),
             action: 'add',
-            actionData: {}
+            actionData: {},
+            // user_id: user.id // Not strictly needed for local default, but good for consistency if it were saved
           }
         ];
         setNotifications(defaultNotifications);
         setUnreadCount(1);
       } else {
         console.log('Notifications fetched successfully:', data);
-        setNotifications(data);
-        setUnreadCount(data.filter(notification => !notification.read).length);
+        setNotifications(data || []); // Ensure data is not null
+        setUnreadCount(data ? data.filter(notification => !notification.read).length : 0);
       }
     } catch (error) {
       console.error('Exception fetching notifications:', error.message);
@@ -155,10 +172,17 @@ function HomeScreen({ navigation }) {
     try {
       console.log('Fetching collection stats from Supabase...');
       
-      // Query the total number of items from the items table
-      const { data: totalItemsData, error: totalItemsError } = await supabase
+      if (!user || !user.id) {
+        console.log('User not available, skipping fetchCollectionStats');
+        setStats({ totalItems: 0, mostValuable: 'None' }); // Clear stats if no user
+        return;
+      }
+
+      // Query the total number of items from the items table for the current user
+      const { count: totalItemsCount, error: totalItemsError } = await supabase
         .from('items')
-        .select('id', { count: 'exact' });
+        .select('*', { count: 'exact', head: true }) // Using head:true to only get count
+        .eq('user_id', user.id); // Filter by user_id
       
       if (totalItemsError) {
         console.error('Error fetching total items:', totalItemsError);
@@ -170,10 +194,11 @@ function HomeScreen({ navigation }) {
         return;
       }
       
-      // Query the most valuable item from the items table
+      // Query the most valuable item from the items table for the current user
       const { data: mostValuableItemData, error: mostValuableItemError } = await supabase
         .from('items')
         .select('name')
+        .eq('user_id', user.id) // Filter by user_id
         .order('value', { ascending: false })
         .limit(1);
       
@@ -187,10 +212,10 @@ function HomeScreen({ navigation }) {
         return;
       }
       
-      console.log('Collection stats fetched successfully:', totalItemsData, mostValuableItemData);
+      console.log('Collection stats fetched successfully:', totalItemsCount, mostValuableItemData);
       setStats({
-        totalItems: totalItemsData.count,
-        mostValuable: mostValuableItemData[0] ? mostValuableItemData[0].name : 'None',
+        totalItems: totalItemsCount || 0,
+        mostValuable: mostValuableItemData && mostValuableItemData.length > 0 ? mostValuableItemData[0].name : 'None',
       });
     } catch (error) {
       console.error('Exception fetching collection stats:', error.message);
@@ -205,10 +230,16 @@ function HomeScreen({ navigation }) {
   // Fetch items when component mounts or user changes
   useEffect(() => {
     if (user) {
+      setLoading(true); // Set loading when user is present and we're about to fetch
       fetchRecentItems();
       fetchNotifications();
       fetchCollectionStats();
     } else {
+      // Clear data when user logs out or is not present
+      setRecentItems([]);
+      setNotifications([]);
+      setUnreadCount(0);
+      setStats({ totalItems: 0, mostValuable: 'None' });
       setLoading(false); // Not loading if not authenticated
     }
   }, [user]);
@@ -316,8 +347,8 @@ function HomeScreen({ navigation }) {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       
       if (status === 'granted') {
-        // Navigate to barcode scanner screen
-        navigation.navigate('BarcodeScanner');
+        // Navigate to barcode scanner screen with lookup mode
+        navigation.navigate('BarcodeScannerScreen', { mode: 'lookup' });
       } else {
         Toast.show({
           type: 'error',
@@ -328,7 +359,7 @@ function HomeScreen({ navigation }) {
     } catch (error) {
       console.error('Error requesting camera permission:', error);
       // Fallback to manual add if camera permission fails
-      navigation.navigate('Add');
+      navigation.navigate('AddMain');
     }
   };
 
@@ -513,7 +544,7 @@ function HomeScreen({ navigation }) {
         >
           <View style={styles.header}>
             <View>
-              <Typography.H2 style={[styles.headerTitle, { color: isDarkMode ? '#FFFFFF' : theme.colors.text }]}>Hello, Collector!</Typography.H2>
+              <Typography.H2 style={[styles.headerTitle, { color: isDarkMode ? '#FFFFFF' : theme.colors.text }]}>Hello, {user?.user_metadata?.username || user?.email?.split('@')[0] || 'Collector'}!</Typography.H2>
               <Typography.Body style={[styles.subtitle, { color: isDarkMode ? '#E0E0E0' : theme.colors.textSecondary }]}>Track your collectibles and discover new ones</Typography.Body>
             </View>
             <View style={styles.headerActions}>

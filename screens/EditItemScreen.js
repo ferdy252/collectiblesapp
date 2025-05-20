@@ -722,7 +722,7 @@ function EditItemScreen({ route, navigation }) {
             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Edit Item</Text>
-          <View style={{ width: 24 }}><Text> </Text></View>
+          <View style={{ width: 24 }} />
         </View>
 
         {/* Item Name */}

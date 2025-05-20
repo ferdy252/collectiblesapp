@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
+  Text,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -33,6 +34,7 @@ import { handleAnalysisComplete } from './aiUtils';
 import { normalizeImageUri } from '../../utils/uriUtils';
 import { CATEGORIES, CONDITIONS, MAX_PHOTOS } from './constants';
 import { styles } from './styles'; // Assuming styles.js has been updated with options screen styles
+import BarcodeScannerScreen from './BarcodeScannerScreen'; // Added import
 
 // The main component wrapper that provides context
 const AddItemScreenWrapper = ({ navigation, route }) => {
@@ -81,6 +83,32 @@ const AddItemScreenContent = ({ navigation, route }) => {
       loadCollections();
     }
   }, [currentUser]);
+
+  // Handle barcode data when received from scanner
+  useEffect(() => {
+    if (route.params?.barcodeData) {
+      // If we're on the options screen, switch to the form
+      setShowOptionsScreen(false);
+      
+      // If we have product info from lookup, pre-fill the form
+      if (route.params.productInfo) {
+        const { name, brand, category } = route.params.productInfo;
+        dispatch({ type: ACTIONS.SET_ITEM_NAME, payload: name || '' });
+        dispatch({ type: ACTIONS.SET_BRAND, payload: brand || '' });
+        if (category && CATEGORIES.includes(category)) {
+          dispatch({ type: ACTIONS.SET_CATEGORY, payload: category });
+        }
+      }
+      
+      // Store the barcode in notes
+      const existingNotes = state.notes || '';
+      const barcodeNote = `Barcode: ${route.params.barcodeData}`;
+      dispatch({ 
+        type: ACTIONS.SET_NOTES, 
+        payload: existingNotes ? `${existingNotes}\n${barcodeNote}` : barcodeNote 
+      });
+    }
+  }, [route.params?.barcodeData]);
 
   const loadCollections = async () => {
     dispatch({ type: ACTIONS.SET_LOADING, payload: true });
@@ -195,7 +223,7 @@ const AddItemScreenContent = ({ navigation, route }) => {
         <View style={styles.optionsContainer}>
           <Typography.H3 style={[styles.optionsTitle, {color: theme.colors.text}]}>Choose how to add your item</Typography.H3>
 
-          <TouchableOpacity style={[styles.optionButton, {backgroundColor: theme.colors.card}]} onPress={() => Toast.show({ type: 'info', text1: 'Coming Soon', text2: 'Barcode scanning will be available soon.' })}>
+          <TouchableOpacity style={[styles.optionButton, {backgroundColor: theme.colors.card}]} onPress={() => navigation.navigate('BarcodeScannerScreen')}>
             <Ionicons name="barcode-outline" size={36} color={theme.colors.primary} style={styles.optionIcon} />
             <View style={styles.optionTextContainer}>
               <Typography.H3 style={[styles.optionTitle, {color: theme.colors.text}]}>Scan Barcode</Typography.H3>
@@ -250,7 +278,7 @@ const AddItemScreenContent = ({ navigation, route }) => {
           data={[{ key: 'form' }]} // Dummy data for FlatList structure
           renderItem={() => (
             <View style={styles.scrollContent}>
-              <Typography.H3 style={[styles.sectionTitle, {color: theme.colors.text}]}>Photos (Max {MAX_PHOTOS})</Typography.H3>
+              <Typography.H3 style={[styles.sectionTitle, {color: theme.colors.text}]}>{`Photos (Max ${MAX_PHOTOS})`}</Typography.H3>
               <UnifiedImagePicker
                 images={images}
                 onImagesChange={(newImages) => dispatch({ type: ACTIONS.SET_IMAGES, payload: newImages })}

@@ -160,7 +160,7 @@ export const AuthProvider = ({ children }) => {
 
   // --- Authentication Functions ---
 
-  const signUp = async (email, password) => {
+  const signUp = async (email, password, metadata = {}) => {
     // Validate password strength before attempting signup
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.isValid) {
@@ -174,18 +174,54 @@ export const AuthProvider = ({ children }) => {
     }
     
     setLoading(true);
+    
+    // Prepare user metadata with default username if not provided
+    const userMetadata = {
+      ...metadata,
+      // Generate a default username if not provided
+      username: metadata.username || `user_${Math.random().toString(36).substring(2, 10)}`
+    };
+    
+    // Sign up with the metadata
     const { data, error } = await supabase.auth.signUp({
       email: email,
       password: password,
+      options: {
+        data: userMetadata
+      }
     });
+    
     setLoading(false);
+    
     if (error) {
       console.error('Sign up error:', error.message);
-      // Consider showing a toast error here
     } else {
-      // You might want to automatically sign in or prompt for confirmation
       console.log('Sign up successful:', data);
+      
+      // If sign-up is successful and we have a user ID, update the profile
+      if (data?.user?.id) {
+        try {
+          // Update the profiles table with the additional information
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: data.user.id,
+              username: userMetadata.username,
+              first_name: userMetadata.first_name || null,
+              last_name: userMetadata.last_name || null,
+              display_name: userMetadata.display_name || userMetadata.username,
+              updated_at: new Date().toISOString()
+            });
+            
+          if (profileError) {
+            console.error('Error updating profile:', profileError.message);
+          }
+        } catch (profileUpdateError) {
+          console.error('Exception updating profile:', profileUpdateError);
+        }
+      }
     }
+    
     return { data, error };
   };
 

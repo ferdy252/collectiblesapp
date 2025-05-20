@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Share,
   Modal,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -36,6 +37,11 @@ const SettingsScreen = ({ navigation, route }) => {
   const [showMfaSetup, setShowMfaSetup] = useState(false);
   const [disablingMfa, setDisablingMfa] = useState(false);
   const { user, signOut, notificationsEnabled, toggleNotifications, mfaEnabled, mfaFactorId } = useAuth();
+
+  // State for account deletion modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // Check if we should trigger export on mount (from quick action)
   useEffect(() => {
@@ -399,6 +405,70 @@ const SettingsScreen = ({ navigation, route }) => {
     }
   };
 
+  // Handlers for Account Deletion
+  const handleOpenDeleteModal = () => {
+    setShowDeleteModal(true);
+  };
+
+  const handleCancelDeletion = () => {
+    setShowDeleteModal(false);
+    setDeleteConfirmationText('');
+    setIsDeletingAccount(false);
+  };
+
+  const handleConfirmDeletion = async () => {
+    if (deleteConfirmationText.toLowerCase() !== 'delete') {
+      Toast.show({
+        type: 'error',
+        text1: 'Confirmation Failed',
+        text2: 'Please type "delete" to confirm.'
+      });
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    console.log('Attempting to delete account...');
+
+    try {
+      if (!user || !user.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // Call the Supabase Edge Function to delete the user account
+      // Pass the user ID explicitly to help with authentication
+      const { data, error } = await supabase.functions.invoke('delete-account', {
+        body: { userId: user.id }
+      });
+
+      if (error) {
+        console.error('Function error:', error);
+        throw new Error(error.message || 'Error calling delete account function');
+      }
+
+      console.log('Account deletion response:', data);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Account Deleted',
+        text2: 'Your account and all associated data have been deleted.',
+        visibilityTime: 4000,
+      });
+      
+      // Log out the user after successful deletion
+      await signOut();
+      handleCancelDeletion(); // Close modal
+
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Deletion Failed',
+        text2: error.message || 'Could not delete account. Please try again.',
+      });
+      setIsDeletingAccount(false);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
@@ -645,6 +715,28 @@ const SettingsScreen = ({ navigation, route }) => {
             <Text style={[styles.versionText, { color: theme.colors.textSecondary }]}>1.0.0</Text>
           </View>
         </View>
+
+        {/* Danger Zone Section */}
+        <View style={[
+          styles.section, 
+          styles.dangerZone, 
+          { 
+            backgroundColor: theme.colors.card, 
+            borderTopColor: theme.colors.error // Apply theme-dependent border color inline
+          }
+        ]}>
+          <Text style={[styles.sectionTitle, styles.dangerZoneTitle, { color: theme.colors.error }]}>Danger Zone</Text>
+          <TouchableOpacity 
+            style={styles.settingRow} 
+            onPress={handleOpenDeleteModal}
+          >
+            <View style={styles.settingInfo}>
+              <Ionicons name="trash-outline" size={22} color={theme.colors.error} />
+              <Text style={[styles.settingText, { color: theme.colors.error }]}>Delete Account</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.error} />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       {/* MFA Setup Modal */}
@@ -658,6 +750,67 @@ const SettingsScreen = ({ navigation, route }) => {
           onComplete={handleMfaSetupComplete}
           onCancel={handleMfaSetupCancel}
         />
+      </Modal>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showDeleteModal}
+        onRequestClose={handleCancelDeletion}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Delete Account</Text>
+            <Text style={[styles.modalWarningText, { color: theme.colors.textSecondary }]}>
+              Are you sure you want to delete your account? This action is irreversible and will permanently delete all your data, including items, collections, and app settings. 
+              <Text style={{ fontWeight: 'bold', color: theme.colors.error }}>Please ensure you have exported any data you wish to keep beforehand.</Text>
+            </Text>
+            
+            <TextInput
+              style={[
+                styles.deleteConfirmationInput,
+                { 
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text,
+                  backgroundColor: theme.colors.inputBackground 
+                }
+              ]}
+              placeholder="Type 'delete' to confirm"
+              placeholderTextColor={theme.colors.textSecondary}
+              value={deleteConfirmationText}
+              onChangeText={setDeleteConfirmationText}
+              autoCapitalize="none"
+            />
+
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton, { backgroundColor: theme.colors.surface }]} 
+                onPress={handleCancelDeletion}
+                disabled={isDeletingAccount}
+              >
+                <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[
+                  styles.modalButton, 
+                  styles.confirmDeleteButton,
+                  {
+                    backgroundColor: deleteConfirmationText.toLowerCase() === 'delete' && !isDeletingAccount ? theme.colors.error : theme.colors.disabled
+                  }
+                ]} 
+                onPress={handleConfirmDeletion}
+                disabled={deleteConfirmationText.toLowerCase() !== 'delete' || isDeletingAccount}
+              >
+                {isDeletingAccount ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>Confirm Deletion</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -742,6 +895,78 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  // Styles for Delete Account Modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  modalContent: {
+    width: '90%',
+    borderRadius: 15,
+    padding: 25,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  modalWarningText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  deleteConfirmationInput: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    fontSize: 16,
+    marginBottom: 25,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    // No specific background, uses theme.colors.surface
+  },
+  confirmDeleteButton: {
+    // Background color set dynamically based on state
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dangerZone: {
+    marginTop: 20, // Add some space before this section
+    borderTopWidth: 1, // Optional: visually separate it more
+  },
+  dangerZoneTitle: {
+    // Styles for the 'Danger Zone' title, inherits from sectionTitle but can be overridden
+    fontWeight: 'bold',
   },
 });
 
