@@ -351,12 +351,12 @@ function ItemDetailScreen({ route, navigation }) {
       setAnalyzingCondition(true);
       setHasError(false);
       
-      // Use the first image for analysis
-      const imageUri = itemPhotos[0];
+      // Use all available images for a more accurate condition analysis
+      // Our updated function can handle multiple images at once
       
-      // Call the Gemini API to analyze the condition
+      // Call the Gemini API to analyze the condition with all images
       const analysisResult = await analyzeItemCondition(
-        imageUri,
+        itemPhotos, // Pass the entire array of images
         item.name,
         item.category
       );
