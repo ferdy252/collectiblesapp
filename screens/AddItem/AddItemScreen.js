@@ -295,12 +295,46 @@ const AddItemScreenContent = ({ navigation, route }) => {
 
                 <View style={[styles.dropdownContainer, { zIndex: 3000 }]}>
                   <Typography.Label style={[styles.inputLabel, {color: theme.colors.text}]}>Category*</Typography.Label>
-                  <DropDownPicker open={categoryOpen} value={selectedCategory} items={categoryPickerItems} setOpen={open => dispatch({ type: ACTIONS.SET_CATEGORY_OPEN, payload: open })} setValue={val => dispatch({ type: ACTIONS.SET_SELECTED_CATEGORY, payload: val() })} listMode="SCROLLVIEW" style={styles.dropdown} containerStyle={styles.dropdownContainerStyle} dropDownContainerStyle={styles.dropdownListStyle} placeholder="Select a category" />
+                  <DropDownPicker
+                    open={categoryOpen}
+                    value={selectedCategory}
+                    items={categoryPickerItems}
+                    setOpen={open => dispatch({ type: ACTIONS.SET_CATEGORY_OPEN, payload: open })}
+                    setValue={val => dispatch({ type: ACTIONS.SET_SELECTED_CATEGORY, payload: val() })}
+                    listMode="SCROLLVIEW"
+                    style={styles.dropdown}
+                    containerStyle={styles.dropdownContainerStyle}
+                    dropDownContainerStyle={styles.dropdownListStyle}
+                    placeholder="Select a category"
+                    LabelComponent={({label}) => <Typography.Body>{label}</Typography.Body>}
+                    ListItemLabelComponent={({label}) => <Typography.Body>{label}</Typography.Body>}
+                    TickIconComponent={() => <Ionicons name="checkmark" size={18} color={theme.colors.primary} />}
+                    ArrowDownIconComponent={() => <Ionicons name="chevron-down" size={18} color={theme.colors.text} />}
+                    ArrowUpIconComponent={() => <Ionicons name="chevron-up" size={18} color={theme.colors.text} />}
+                    PlaceholderComponent={({placeholder}) => <Typography.Body style={{color: theme.colors.textSecondary}}>{placeholder}</Typography.Body>}
+                  />
                 </View>
 
                 <View style={[styles.dropdownContainer, { zIndex: 2000 }]}>
                   <Typography.Label style={[styles.inputLabel, {color: theme.colors.text}]}>Condition</Typography.Label>
-                  <DropDownPicker open={conditionOpen} value={selectedCondition} items={conditionPickerItems} setOpen={open => dispatch({ type: ACTIONS.SET_CONDITION_OPEN, payload: open })} setValue={val => dispatch({ type: ACTIONS.SET_SELECTED_CONDITION, payload: val() })} listMode="SCROLLVIEW" style={styles.dropdown} containerStyle={styles.dropdownContainerStyle} dropDownContainerStyle={styles.dropdownListStyle} placeholder="Select condition" />
+                  <DropDownPicker
+                    open={conditionOpen}
+                    value={selectedCondition}
+                    items={conditionPickerItems}
+                    setOpen={open => dispatch({ type: ACTIONS.SET_CONDITION_OPEN, payload: open })}
+                    setValue={val => dispatch({ type: ACTIONS.SET_SELECTED_CONDITION, payload: val() })}
+                    listMode="SCROLLVIEW"
+                    style={styles.dropdown}
+                    containerStyle={styles.dropdownContainerStyle}
+                    dropDownContainerStyle={styles.dropdownListStyle}
+                    placeholder="Select condition"
+                    LabelComponent={({label}) => <Typography.Body>{label}</Typography.Body>}
+                    ListItemLabelComponent={({label}) => <Typography.Body>{label}</Typography.Body>}
+                    TickIconComponent={() => <Ionicons name="checkmark" size={18} color={theme.colors.primary} />}
+                    ArrowDownIconComponent={() => <Ionicons name="chevron-down" size={18} color={theme.colors.text} />}
+                    ArrowUpIconComponent={() => <Ionicons name="chevron-up" size={18} color={theme.colors.text} />}
+                    PlaceholderComponent={({placeholder}) => <Typography.Body style={{color: theme.colors.textSecondary}}>{placeholder}</Typography.Body>}
+                  />
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -320,7 +354,24 @@ const AddItemScreenContent = ({ navigation, route }) => {
 
                 <View style={[styles.dropdownContainer, { zIndex: 1000 }]}>
                   <Typography.Label style={[styles.inputLabel, {color: theme.colors.text}]}>Collection (Optional)</Typography.Label>
-                  <DropDownPicker open={collectionOpen} value={selectedCollectionId} items={collectionItems} setOpen={open => dispatch({ type: ACTIONS.SET_COLLECTION_OPEN, payload: open })} setValue={val => dispatch({ type: ACTIONS.SET_SELECTED_COLLECTION_ID, payload: val() })} listMode="SCROLLVIEW" style={styles.dropdown} containerStyle={styles.dropdownContainerStyle} dropDownContainerStyle={styles.dropdownListStyle} placeholder="Select a collection" />
+                  <DropDownPicker
+                    open={collectionOpen}
+                    value={selectedCollectionId}
+                    items={collectionItems}
+                    setOpen={open => dispatch({ type: ACTIONS.SET_COLLECTION_OPEN, payload: open })}
+                    setValue={val => dispatch({ type: ACTIONS.SET_SELECTED_COLLECTION_ID, payload: val() })}
+                    listMode="SCROLLVIEW"
+                    style={styles.dropdown}
+                    containerStyle={styles.dropdownContainerStyle}
+                    dropDownContainerStyle={styles.dropdownListStyle}
+                    placeholder="Select a collection"
+                    LabelComponent={({label}) => <Typography.Body>{label}</Typography.Body>}
+                    ListItemLabelComponent={({label}) => <Typography.Body>{label}</Typography.Body>}
+                    TickIconComponent={() => <Ionicons name="checkmark" size={18} color={theme.colors.primary} />}
+                    ArrowDownIconComponent={() => <Ionicons name="chevron-down" size={18} color={theme.colors.text} />}
+                    ArrowUpIconComponent={() => <Ionicons name="chevron-up" size={18} color={theme.colors.text} />}
+                    PlaceholderComponent={({placeholder}) => <Typography.Body style={{color: theme.colors.textSecondary}}>{placeholder}</Typography.Body>}
+                  />
                 </View>
                 
                  <View style={styles.switchContainer}>

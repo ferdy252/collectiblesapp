@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Text, View, ActivityIndicator, StyleSheet, Platform, StatusBar } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Platform, StatusBar } from 'react-native';
+import { Typography } from './theme/styled';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -7,7 +8,7 @@ import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import HomeScreen from './screens/HomeScreen';
+import HomeScreen from './screens/Home';
 import CollectionsScreen from './screens/CollectionsScreen';
 import { AddItemScreen } from './screens/AddItem';
 import ItemDetailScreen from './screens/ItemDetailScreen';
@@ -25,7 +26,7 @@ import ImagePickerScreen from './screens/AddItem/ImagePickerScreen';
 import FeedbackHistoryScreen from './screens/FeedbackHistoryScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import AuthScreen from './screens/AuthScreen';
+import AuthScreen from './screens/Auth';
 import CollectionItemsScreen from './screens/CollectionItemsScreen';
 import AllItemsScreen from './screens/AllItemsScreen';
 import EditItemScreen from './screens/EditItemScreen';
@@ -168,7 +169,7 @@ function LoadingScreen() {
   return (
     <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
       <ActivityIndicator size="large" color={theme.colors.primary} />
-      <Text style={[styles.loadingText, { color: theme.colors.text }]}>Loading...</Text>
+      <Typography.Body style={[styles.loadingText, { color: theme.colors.text }]}>Loading...</Typography.Body>
     </View>
   );
 }

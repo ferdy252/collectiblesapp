@@ -5,7 +5,6 @@ import {
   Image,
   ActivityIndicator,
   StyleSheet,
-  Text,
   Alert,
   Platform,
 } from 'react-native';
@@ -13,7 +12,7 @@ import { normalizeImageUri } from '../utils/uriUtils';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
-// Removed Typography import to avoid layout conflicts
+import { Typography } from '../theme/styled'; // Added Typography import
 
 /**
  * An improved camera component that ensures image URIs are properly formatted and preserved
@@ -134,18 +133,18 @@ const CameraViewFix = ({ onImageCaptured }) => {
           color={theme.colors.primary} 
           style={styles.illustrationIcon} 
         />
-        <Text style={styles.illustrationText}>
+        <Typography.Body style={styles.illustrationText}>
           Capture or select an image of your collectible
-        </Text>
+        </Typography.Body>
       </View>
       
       {/* Error message */}
       {error && (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={20} color={theme.colors.error} />
-          <Text style={[styles.errorText, { color: theme.colors.error }]}>
+          <Typography.Body style={[styles.errorText, { color: theme.colors.error }]}>
             {error}
-          </Text>
+          </Typography.Body>
         </View>
       )}
       
@@ -157,7 +156,7 @@ const CameraViewFix = ({ onImageCaptured }) => {
           disabled={loading}
         >
           <Ionicons name="camera" size={24} color="white" style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Take Photo</Text>
+          <Typography.Body style={styles.buttonText}>Take Photo</Typography.Body>
         </TouchableOpacity>
         
         <TouchableOpacity 
@@ -166,7 +165,7 @@ const CameraViewFix = ({ onImageCaptured }) => {
           disabled={loading}
         >
           <Ionicons name="images" size={24} color="white" style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Select Image</Text>
+          <Typography.Body style={styles.buttonText}>Select Image</Typography.Body>
         </TouchableOpacity>
       </View>
       
@@ -174,7 +173,7 @@ const CameraViewFix = ({ onImageCaptured }) => {
       {loading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>Processing image...</Text>
+          <Typography.Body style={styles.loadingText}>Processing image...</Typography.Body>
         </View>
       )}
     </View>

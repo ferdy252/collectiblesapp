@@ -5,7 +5,6 @@ import {
   Image,
   ActivityIndicator,
   StyleSheet,
-  Text,
   Alert,
   Modal,
   Dimensions,
@@ -377,7 +376,7 @@ const UnifiedImagePicker = ({
           disabled={analyzing}
         >
           <Ionicons name="add-circle-outline" size={24} color="white" style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Add Photo</Text>
+          <Typography.Body style={styles.buttonText}>Add Photo</Typography.Body>
         </TouchableOpacity>
       )}
       
@@ -385,9 +384,9 @@ const UnifiedImagePicker = ({
       {error && (
         <View style={styles.errorContainer}>
           <Ionicons name="information-circle" size={20} color={theme.colors.warning} style={styles.errorIcon} />
-          <Text style={[styles.errorText, { color: theme.colors.warning }]}>
+          <Typography.Body style={[styles.errorText, { color: theme.colors.warning }]}>
             {error}
-          </Text>
+          </Typography.Body>
         </View>
       )}
       
@@ -402,7 +401,7 @@ const UnifiedImagePicker = ({
         <SafeAreaView style={[styles.cameraViewContainer, { backgroundColor: theme.colors.background }]}>
           <View style={styles.cameraViewHeader}>
             <View style={styles.headerLine} />
-            <Text style={[styles.cameraViewTitle, {fontSize: 20, fontWeight: 'bold', color: theme.colors.text}]}>Add Photo</Text>
+            <Typography.H3 style={[styles.cameraViewTitle, {color: theme.colors.text}]}>Add Photo</Typography.H3>
             <TouchableOpacity
               onPress={() => setShowCameraView(false)}
               style={styles.closeButton}
@@ -441,7 +440,7 @@ const UnifiedImagePicker = ({
               <Ionicons name="scan-outline" size={40} color={theme.colors.primary} />
             </View>
             
-            <Text style={[styles.modalTitleText, {color: theme.colors.text}]}>Analyze with AI?</Text>
+            <Typography.H3 style={[styles.modalTitleText, {color: theme.colors.text}]}>Analyze with AI?</Typography.H3>
             
             {/* Image preview */}
             {tempImageUri && (
@@ -450,9 +449,9 @@ const UnifiedImagePicker = ({
               </View>
             )}
             
-            <Text style={[styles.modalBodyText, {color: theme.colors.text}]}>
+            <Typography.Body style={[styles.modalBodyText, {color: theme.colors.text}]}>
               Would you like to use AI to analyze this image and auto-fill item details?
-            </Text>
+            </Typography.Body>
             
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -462,7 +461,7 @@ const UnifiedImagePicker = ({
                 ]}
                 onPress={() => handleAnalysisChoice(false)}
               >
-                <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>Just Add Image</Text>
+                <Typography.Body style={[styles.modalButtonText, { color: theme.colors.text }]}>Just Add Image</Typography.Body>
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -473,7 +472,7 @@ const UnifiedImagePicker = ({
                 onPress={() => handleAnalysisChoice(true)}
               >
                 <Ionicons name="flash" size={18} color="white" style={{ marginRight: 6 }} />
-                <Text style={[styles.modalButtonText, { color: 'white' }]}>Analyze with AI</Text>
+                <Typography.Body style={[styles.modalButtonText, { color: 'white' }]}>Analyze with AI</Typography.Body>
               </TouchableOpacity>
             </View>
           </View>
@@ -484,9 +483,9 @@ const UnifiedImagePicker = ({
       {analyzing && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={[styles.loadingText, {color: theme.colors.text}]}>
+          <Typography.Body style={[styles.loadingText, {color: theme.colors.text}]}>
             Analyzing image with AI...
-          </Text>
+          </Typography.Body>
         </View>
       )}
     </View>

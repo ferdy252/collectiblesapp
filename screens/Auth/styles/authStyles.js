@@ -1,0 +1,190 @@
+// screens/Auth/styles/authStyles.js
+import { StyleSheet, Platform } from 'react-native';
+
+const authStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  mainContent: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logoBox: {
+    width: 100,
+    height: 100,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 93, 58, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#FF5D3A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 10,
+    letterSpacing: 0.3,
+  },
+  formContainer: {
+    width: '100%',
+    marginTop: 20,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    height: 60,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  inputIcon: {
+    paddingHorizontal: 16,
+  },
+  input: {
+    flex: 1,
+    height: 60,
+    paddingHorizontal: 8,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  lockoutContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+  },
+  lockoutText: {
+    marginLeft: 8,
+    fontSize: 14,
+    flex: 1,
+    fontWeight: '500',
+  },
+  button: {
+    height: 60,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  signUpButton: {
+    height: 60,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FF5D3A',
+    backgroundColor: 'transparent',
+  },
+  signUpButtonText: {
+    color: '#FF5D3A',
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  errorMessage: {
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+  },
+  errorText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  themeToggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    padding: 10,
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 30,
+    right: 10,
+    zIndex: 10,
+  },
+  themeToggle: {
+    marginLeft: 10,
+  },
+  passwordToggle: {
+    padding: 16,
+  },
+  confirmationMessage: {
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    backgroundColor: 'rgba(72, 187, 120, 0.1)',
+  },
+  confirmationText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  passwordStrengthContainer: {
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+  },
+  passwordStrengthLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  passwordTipsContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  passwordTip: {
+    fontSize: 13,
+    marginBottom: 4,
+  },
+});
+
+export default authStyles;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Text, View, TouchableOpacity, TextInput, StyleSheet, Pressable } from 'react-native';
+import { Text, View, TouchableOpacity, TextInput, StyleSheet, Pressable, Platform } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, interpolateColor } from 'react-native-reanimated';
 import theme from './theme';
 
@@ -651,7 +651,50 @@ export const Layout = {
 
 // Create a function to generate styles using the theme
 export const createThemedStyles = (styleFunction) => {
-  return StyleSheet.create(styleFunction(theme));
+  try {
+    // Get the styles from the style function
+    const styles = styleFunction(theme);
+    
+    // Process the styles to handle any Platform.select calls
+    const processStyles = (styleObj) => {
+      if (!styleObj) return styleObj;
+      
+      return Object.entries(styleObj).reduce((result, [key, value]) => {
+        if (value && typeof value === 'object' && value.select) {
+          // This value has a 'select' method. Attempt to call it.
+          // This is where the error might originate if value.select uses a non-existent Platform.
+          try {
+            // The original call was value.select({ ios: true, android: true });
+            // This argument pattern is unusual for a typical Platform.select replacement.
+            // We'll keep it if it's an intentional custom API for this app.
+            result[key] = value.select({ ios: true, android: true });
+          } catch (e) {
+            console.warn(
+              `Error executing 'select' method for style key "${key}":`,
+              e.message,
+              "Falling back to the original value or a sensible default."
+            );
+            // Fallback: use the value object itself, or try to find a 'default' property if it exists
+            result[key] = value.default !== undefined ? value.default : value;
+          }
+        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+          // Recursively process nested objects
+          result[key] = processStyles(value);
+        } else {
+          // Keep the value as is
+          result[key] = value;
+        }
+        return result;
+      }, {});
+    };
+    
+    // Process the styles and create the StyleSheet
+    const processedStyles = processStyles(styles);
+    return StyleSheet.create(processedStyles);
+  } catch (error) {
+    console.error('Error creating themed styles:', error.message, error.stack); // Log more details
+    return StyleSheet.create({});
+  }
 };
 
 // Export a helper to access theme directly

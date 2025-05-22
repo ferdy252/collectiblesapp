@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Text, View, StyleSheet, Button, Linking, Platform, TouchableOpacity, ActivityIndicator, Alert, SafeAreaView, StatusBar } from 'react-native';
+import { View, StyleSheet, Button, Linking, Platform, TouchableOpacity, ActivityIndicator, Alert, SafeAreaView, StatusBar } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { Typography } from '../../theme/styled';
 
 export default function BarcodeScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -111,16 +112,16 @@ export default function BarcodeScannerScreen() {
     // Camera permissions are not granted yet
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.message, { color: colors.text }]}>We need your permission to show the camera</Text>
+        <Typography.Body style={[styles.message, { color: colors.text }]}>We need your permission to show the camera</Typography.Body>
         <Button onPress={requestPermission} title="Grant Permission" color={colors.primary} />
-        <Text style={[styles.info, { color: colors.text }]}>
+        <Typography.Body style={[styles.info, { color: colors.text }]}>
           If you've already denied permission, you might need to enable it in your device settings.
-        </Text>
+        </Typography.Body>
         {Platform.OS === 'ios' && 
             <Button onPress={() => Linking.openSettings()} title="Open Settings" color={colors.primary} />
         }
         <TouchableOpacity style={styles.button_cancel} onPress={handleCancel}>
-          <Text style={[styles.buttonText_cancel, { color: colors.text }]}>Go Back</Text>
+          <Typography.Body style={[styles.buttonText_cancel, { color: colors.text }]}>Go Back</Typography.Body>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -134,23 +135,23 @@ export default function BarcodeScannerScreen() {
   if (hasPermission === false) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', padding: 20 }]}>
-        <Text style={[styles.message, { color: colors.text, marginBottom: 20 }]}>
+        <Typography.Body style={[styles.message, { color: colors.text, marginBottom: 20 }]}>
           No access to camera
-        </Text>
-        <Text style={[styles.info, { color: colors.text, marginBottom: 20 }]}>
+        </Typography.Body>
+        <Typography.Body style={[styles.info, { color: colors.text, marginBottom: 20 }]}>
           Please grant camera permissions to use the barcode scanner.
-        </Text>
+        </Typography.Body>
         <TouchableOpacity 
           style={[styles.button, { backgroundColor: colors.primary }]}
           onPress={() => Linking.openSettings()}
         >
-          <Text style={styles.buttonText}>Open Settings</Text>
+          <Typography.Body style={styles.buttonText}>Open Settings</Typography.Body>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.button, { backgroundColor: colors.card, marginTop: 10 }]}
           onPress={handleCancel}
         >
-          <Text style={[styles.buttonText, { color: colors.text }]}>Go Back</Text>
+          <Typography.Body style={[styles.buttonText, { color: colors.text }]}>Go Back</Typography.Body>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -176,7 +177,7 @@ export default function BarcodeScannerScreen() {
         >
           <Ionicons name="close" size={28} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.title}>Scan Barcode</Text>
+        <Typography.H3 style={styles.title}>Scan Barcode</Typography.H3>
         <TouchableOpacity 
           style={styles.buttonIcon}
           onPress={toggleFlash}
@@ -197,7 +198,7 @@ export default function BarcodeScannerScreen() {
         <View style={styles.bottomRightCorner} />
       </View>
       
-      <Text style={styles.helpText}>Align barcode within the frame to scan</Text>
+      <Typography.BodySmall style={styles.helpText}>Align barcode within the frame to scan</Typography.BodySmall>
       
       {/* Bottom Bar */}
       <SafeAreaView style={styles.bottomBar}>
@@ -207,7 +208,7 @@ export default function BarcodeScannerScreen() {
             onPress={() => setScanned(false)}
           >
             <Ionicons name="scan" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.buttonText}>Scan Again</Text>
+            <Typography.Body style={styles.buttonText}>Scan Again</Typography.Body>
           </TouchableOpacity>
         ) : (
           <View style={styles.scanIndicator}>
@@ -221,7 +222,7 @@ export default function BarcodeScannerScreen() {
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingContent}>
             <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.loadingText}>Looking up product...</Text>
+            <Typography.Body style={styles.loadingText}>Looking up product...</Typography.Body>
           </View>
         </View>
       )}

@@ -1,6 +1,7 @@
 // components/ErrorDisplay.js
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { Typography } from '../theme/styled';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 
@@ -23,9 +24,9 @@ function ErrorDisplay({ message, onRetry, style }) {
         color={theme.colors.error} 
       />
       
-      <Text style={[styles.message, { color: theme.colors.text }]}>
+      <Typography.Body style={[styles.message, { color: theme.colors.text }]}>
         {message || 'Something went wrong'}
-      </Text>
+      </Typography.Body>
       
       {onRetry && (
         <TouchableOpacity 
@@ -35,9 +36,9 @@ function ErrorDisplay({ message, onRetry, style }) {
           accessibilityLabel="Retry"
           accessibilityRole="button"
         >
-          <Text style={[styles.retryText, { color: theme.colors.onPrimary }]}>
+          <Typography.Body style={[styles.retryText, { color: theme.colors.onPrimary }]}>
             Try Again
-          </Text>
+          </Typography.Body>
         </TouchableOpacity>
       )}
     </View>
